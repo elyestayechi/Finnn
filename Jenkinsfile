@@ -122,13 +122,13 @@ EOF
             sh '''
             echo "=== Preparing database file ==="
             
-            # Create directory (ignore if already exists)
-            mkdir -p loan_analysis.db 2>/dev/null || true
-            
-            # Create the database file
+            # Force remove and recreate to ensure clean state
+            rm -rf loan_analysis.db
+            mkdir -p loan_analysis.db
             touch loan_analysis.db/finn_database.db
             
             echo "✅ Database file created: loan_analysis.db/finn_database.db"
+            ls -la loan_analysis.db/
             '''
         }
     }
