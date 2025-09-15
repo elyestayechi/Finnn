@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Checkout & Prepare') {
             steps {
-                git branch: 'main', url: 'https://github.com/elyestayechi/Finn.git'
+                git branch: 'main', url: 'https://github.com/elyestayechi/Finnn.git'
                 
                 sh '''
                 echo "=== Preparing workspace ==="
