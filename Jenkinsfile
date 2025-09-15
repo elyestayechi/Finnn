@@ -141,7 +141,7 @@ services:
     volumes:
       - ./Back/Data:/app/Data
       - ./Back/PDF Loans:/app/PDF Loans
-     
+      - finn_db_data:/app/Data  # Use volume for database
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
@@ -165,6 +165,7 @@ services:
 
 volumes:
   ollama_data:
+  finn_db_data:
 EOF
         
         # Deploy only application services
