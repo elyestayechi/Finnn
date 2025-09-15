@@ -250,10 +250,6 @@ EOF
         junit 'Back/test-results/test-results.xml'
         archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
         
-        sh '''
-        echo "=== Cleaning up ==="
-        docker compose -p ${COMPOSE_PROJECT_NAME} down -v 2>/dev/null || true
-        '''
     }
 
     success {
@@ -270,6 +266,16 @@ EOF
         '''
     }
 
-    
+    failure {
+        // Only clean up images if the pipeline failed
+        sh '''
+        echo "=== Cleaning up due to failure ==="
+        docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
+        docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
+        docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
+        '''
+    }
+
+
 }
 }
