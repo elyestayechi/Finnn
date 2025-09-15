@@ -233,7 +233,6 @@ EOF
     
     post {
     always {
-        // Debug test results location
         sh '''
         echo "=== Final test results check ==="
         echo "Looking for XML files:"
@@ -243,18 +242,17 @@ EOF
         echo "Coverage directory:"
         ls -la Back/coverage/ || echo "coverage directory not found"
         '''
-        
-        // Fix the paths - remove the extra "Back/" since we're at root level
-        junit 'test-results/*.xml'
-        archiveArtifacts artifacts: 'coverage/*.xml', fingerprint: true
-        
-        // Clean up
+
+        // ✅ Correct paths
+        junit 'Back/test-results/*.xml'
+        archiveArtifacts artifacts: 'Back/coverage/*.xml', fingerprint: true
+
         sh '''
         echo "=== Cleaning up ==="
         docker compose -p ${COMPOSE_PROJECT_NAME} down -v 2>/dev/null || true
         '''
     }
-    
+
     success {
         sh '''
         echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
@@ -268,7 +266,7 @@ EOF
         echo "docker compose -f docker-compose.monitoring.yml up -d"
         '''
     }
-    
+
     cleanup {
         sh '''
         # Clean up images
