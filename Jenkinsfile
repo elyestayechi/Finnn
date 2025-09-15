@@ -116,7 +116,7 @@ EOF
             }
         }
         
-        stage('Deploy Application Only') {
+        stage('Deploy Application') {
     steps {
         sh '''
         echo "=== Deploying application services only ==="
@@ -135,13 +135,13 @@ services:
     restart: unless-stopped
 
   backend:
-    image: finn-backend:23
+    image: finn-backend:${BUILD_ID}
     ports:
       - "8000:8000"
     volumes:
       - ./Back/Data:/app/Data
       - ./Back/PDF Loans:/app/PDF Loans
-      - ./Back/loan_analysis.db:/app/loan_analysis.db
+      - ./Back/loan_analysis.db:/app/loan_analysis.db  # CORRECT MOUNT!
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
@@ -154,7 +154,7 @@ services:
       start_period: 60s
 
   frontend:
-    image: finn-frontend:23
+    image: finn-frontend:${BUILD_ID}
     ports:
       - "3000:3000"
     depends_on:
@@ -223,6 +223,22 @@ EOF
                         } catch (Exception e) {
                             error "❌ Backend HTTP endpoint failed internal health check: ${e.message}"
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Run Data Migration') {
+            steps {
+                script {
+                    echo "=== Running data migration ==="
+                    
+                    try {
+                        sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                        echo "✅ Data migration completed successfully!"
+                    } catch (Exception e) {
+                        echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
+                        echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
                     }
                 }
             }
