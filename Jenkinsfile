@@ -4,7 +4,8 @@ pipeline {
         DOCKER_HOST = 'unix:///var/run/docker.sock'
         COMPOSE_PROJECT_NAME = "finn-${BUILD_ID}"
         PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-        LOCAL_DATA_PATH = "/Users/asmatayechi/Desktop/Finn" // Update as needed
+        LOCAL_DATA_PATH = "/Users/asmatayechi/Desktop/Finn"
+        PDF_LOANS_DIR = "PDF Loans"  // Handle spaces consistently
     }
 
     stages {
@@ -14,12 +15,29 @@ pipeline {
 
                 sh '''
                 echo "=== Preparing workspace ==="
-                mkdir -p Back/test-results Back/coverage Back/Data "Back/PDF Loans"
+                mkdir -p Back/test-results Back/coverage Back/Data "Back/${PDF_LOANS_DIR}"
 
-                # Copy data files from local machine
-                cp -r "${LOCAL_DATA_PATH}/Back/Data/." Back/Data/ || echo "⚠️ No Data directory to copy"
-                cp -r "${LOCAL_DATA_PATH}/Back/PDF Loans/." "Back/PDF Loans/" || echo "⚠️ No PDF Loans directory to copy"
-                cp "${LOCAL_DATA_PATH}/Back/loan_analysis.db" Back/ 2>/dev/null || echo "⚠️ No DB file to copy"
+                # Copy data files from local machine with proper error handling
+                if [ -d "${LOCAL_DATA_PATH}/Back/Data" ]; then
+                    cp -r "${LOCAL_DATA_PATH}/Back/Data/." Back/Data/
+                    echo "✅ Data directory copied successfully"
+                else
+                    echo "⚠️ No Data directory to copy"
+                fi
+
+                if [ -d "${LOCAL_DATA_PATH}/Back/${PDF_LOANS_DIR}" ]; then
+                    cp -r "${LOCAL_DATA_PATH}/Back/${PDF_LOANS_DIR}/." "Back/${PDF_LOANS_DIR}/"
+                    echo "✅ PDF Loans directory copied successfully"
+                else
+                    echo "⚠️ No PDF Loans directory to copy"
+                fi
+
+                if [ -f "${LOCAL_DATA_PATH}/Back/loan_analysis.db" ]; then
+                    cp "${LOCAL_DATA_PATH}/Back/loan_analysis.db" Back/
+                    echo "✅ DB file copied successfully"
+                else
+                    echo "⚠️ No DB file to copy"
+                fi
                 '''
             }
         }
@@ -55,28 +73,34 @@ pipeline {
         }
 
         stage('Run Migration Before Deployment') {
-    steps {
-        dir('Back') {
-            sh '''
-            echo "=== Running migration in temporary container ==="
-            docker run --rm \
-                -v "$(pwd)/Data:/app/Data" \
-                -v "$(pwd)/PDF Loans:/app/PDF Loans" \
-                -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
-                -e OLLAMA_HOST=http://dummy:11434 \
-                finn-backend-test:${BUILD_ID} \
-                python migrate_data.py
+            steps {
+                dir('Back') {
+                    sh '''
+                    echo "=== Running migration in temporary container ==="
+                    
+                    # Ensure directories exist with proper permissions
+                    mkdir -p Data "PDF Loans"
+                    chmod 777 Data "PDF Loans"
+                    
+                    # Run migration with proper volume mounting
+                    docker run --rm \
+                        -v "$(pwd)/Data:/app/Data" \
+                        -v "$(pwd)/${PDF_LOANS_DIR}:/app/PDF Loans" \
+                        -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
+                        -e OLLAMA_HOST=http://dummy:11434 \
+                        finn-backend:${BUILD_ID} \
+                        python migrate_data.py
 
-            # DEBUG: verify host files
-            echo "=== After migration, host volumes ==="
-            ls -la Data
-            ls -la "PDF Loans"
-            ls -la loan_analysis.db
-            echo "✅ Host volumes populated with data"
-            '''
+                    # Verify migration results
+                    echo "=== After migration, host volumes ==="
+                    ls -la Data/ | head -10
+                    ls -la "${PDF_LOANS_DIR}/" | head -10
+                    ls -la loan_analysis.db
+                    echo "✅ Host volumes populated with data"
+                    '''
+                }
+            }
         }
-    }
-}
 
         stage('Deploy Application') {
             steps {
@@ -101,11 +125,13 @@ services:
       - "8000:8000"
     volumes:
       - ${WORKSPACE}/Back/Data:/app/Data
-      - "${WORKSPACE}/Back/PDF Loans:/app/PDF Loans"
+      - "${WORKSPACE}/Back/${PDF_LOANS_DIR}:/app/PDF Loans"
       - ${WORKSPACE}/Back/loan_analysis.db:/app/loan_analysis.db
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -121,7 +147,7 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE_URL=http://backend:8000
+      - VITE_API_BASE_URL=http://localhost:8000  # Changed for frontend accessibility
     restart: unless-stopped
 
 volumes:
@@ -138,7 +164,11 @@ EOF
             steps {
                 sh '''
                 echo "=== Checking container status ==="
+                sleep 30  # Wait for containers to start
                 docker compose -p ${COMPOSE_PROJECT_NAME} ps
+                
+                echo "=== Testing backend health ==="
+                curl -f http://localhost:8000/health || echo "Backend health check failed"
                 '''
             }
         }
@@ -146,22 +176,25 @@ EOF
 
     post {
         always {
-            // Create coverage directory in the correct location
             sh '''
             echo "=== Ensuring directories exist ==="
             mkdir -p Back/test-results Back/coverage
+            
             # Create placeholder files if they don't exist
             if [ ! -f "Back/test-results/test-results.xml" ]; then
                 echo '<?xml version="1.0" encoding="UTF-8"?><testsuite name="pytest" tests="0" errors="0" failures="0" skipped="0"></testsuite>' > Back/test-results/test-results.xml
             fi
+            
             if [ ! -f "Back/coverage/coverage.xml" ]; then
                 echo '<?xml version="1.0" ?><coverage></coverage>' > Back/coverage/coverage.xml
             fi
             '''
             
-            // Use specific file paths instead of wildcards
             junit 'Back/test-results/test-results.xml'
             archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
+            
+            // Clean up test image
+            sh 'docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true'
         }
 
         success {
@@ -174,16 +207,13 @@ EOF
             echo "Ollama: http://localhost:11435"
             echo ""
             echo "Data migration has been automatically executed."
-            echo "To deploy monitoring separately:"
-            echo "docker compose -f docker-compose.monitoring.yml up -d"
             '''
         }
 
         failure {
-            // Only clean up images if the pipeline failed
             sh '''
             echo "=== Cleaning up due to failure ==="
-            docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
+            docker compose -p ${COMPOSE_PROJECT_NAME} down 2>/dev/null || true
             docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
             docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
             '''
