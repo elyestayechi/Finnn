@@ -115,24 +115,6 @@ EOF
                 '''
             }
         }
-        
-        stage('Prepare Database') {
-    steps {
-        dir('Back') {
-            sh '''
-            echo "=== Preparing database file ==="
-            
-            # Force remove and recreate to ensure clean state
-            rm -rf loan_analysis.db
-            mkdir -p loan_analysis.db
-            touch loan_analysis.db/finn_database.db
-            
-            echo "✅ Database file created: loan_analysis.db/finn_database.db"
-            ls -la loan_analysis.db/
-            '''
-        }
-    }
-}
 
 stage('Deploy Application Only') {
     steps {
@@ -158,7 +140,7 @@ services:
     volumes:
       - ./Back/Data:/app/Data
       - ./Back/PDF Loans:/app/PDF Loans
-      - ./Back/loan_analysis.db/finn_database.db:/app/loan_analysis.db  # SPECIFIC FILE!
+      - ./Back/loan_analysis.db:/app/loan_analysis.db  # DIRECTORY MOUNT (not file)
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
@@ -178,15 +160,48 @@ services:
       - backend
     environment:
       - VITE_API_BASE_URL=http://backend:8000
-    restart: unless-stopped
+    restart: unless极opped
 
 volumes:
   ollama_data:
 EOF
 
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-        echo "✅ Services deployed with proper database mount"
+        echo "✅ Services deployed with directory mount"
         '''
+    }
+}
+
+stage('Run Data Migration') {
+    steps {
+        script {
+            echo "=== Running data migration ==="
+            
+            // Wait for backend to be ready
+            for (int i = 1; i <= 15; i++) {
+                try {
+                    def status = sh(script: "docker compose -p ${COMPOSE_PROJECT_NAME} ps backend --format '{{.Status}}'", returnStdout: true).trim()
+                    if (status.contains("Up") && !status.contains("Exit") && !status.contains("unhealthy")) {
+                        echo "✅ Backend ready for migration"
+                        break
+                    }
+                } catch (Exception e) {
+                    echo "⚠️ Waiting for backend, attempt ${i}/15"
+                    if (i == 15) {
+                        error "❌ Backend not ready for migration"
+                    }
+                    sleep(5)
+                }
+            }
+            
+            // Run migration in the actual container
+            try {
+                sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                echo "✅ Data migration completed!"
+            } catch (Exception e) {
+                echo "⚠️ Data migration failed: ${e.message}"
+            }
+        }
     }
 }
         
