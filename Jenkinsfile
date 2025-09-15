@@ -145,50 +145,40 @@ EOF
         stage('Health Check') {
     steps {
         script {
-            // Check if backend container is running
-            def backendRunning = false
-            for (int i = 1; i <= 10; i++) {
-                def status = sh(script: "docker compose -p ${COMPOSE_PROJECT_NAME} ps backend --format '{{.Status}}'", returnStdout: true).trim()
-                if (status.contains("Up") && !status.contains("Exit") && !status.contains("unhealthy")) {
-                    echo "✅ Backend container is running: ${status}"
-                    backendRunning = true
-                    break
-                } else {
-                    echo "⚠️ Backend container status: ${status}, attempt ${i}/10"
-                    if (i == 10) {
-                        error "❌ Backend container failed to start properly"
-                    }
-                    sleep(10)
-                }
-            }
+            // Get the host IP address
+            def hostIp = sh(script: "ip route | grep default | awk '{print \\$3}'", returnStdout: true).trim()
             
-            // Check if frontend container is running
-            def frontendRunning = false
+            // Backend health check
+            def backendHealthy = false
             for (int i = 1; i <= 10; i++) {
-                def status = sh(script: "docker compose -p ${COMPOSE_PROJECT_NAME} ps frontend --format '{{.Status}}'", returnStdout: true).trim()
-                if (status.contains("Up") && !status.contains("Exit") && !status.contains("unhealthy")) {
-                    echo "✅ Frontend container is running: ${status}"
-                    frontendRunning = true
-                    break
-                } else {
-                    echo "⚠️ Frontend container status: ${status}, attempt ${i}/10"
-                    if (i == 10) {
-                        error "❌ Frontend container failed to start properly"
-                    }
-                    sleep(10)
-                }
-            }
-            
-            if (backendRunning && frontendRunning) {
-                echo "✅ All application containers are running"
-                
-                // Optional: Try actual HTTP check with host IP as final verification
                 try {
-                    def hostIp = sh(script: "hostname -i | awk '{print \\$1}'", returnStdout: true).trim()
-                    sh "curl -f http://${hostIp}:8000/health"
-                    echo "✅ Backend HTTP endpoint is responsive"
+                    sh "curl -f http://${hostIp}:8000/health"  // Use host IP instead of localhost
+                    echo "✅ Backend is healthy"
+                    backendHealthy = true
+                    break
                 } catch (Exception e) {
-                    echo "⚠️ Backend HTTP check failed, but container is running"
+                    echo "⚠️ Backend health check attempt ${i}/10 failed, retrying..."
+                    if (i == 10) {
+                        error "❌ Backend health check failed after 10 attempts"
+                    }
+                    sleep(10)
+                }
+            }
+            
+            // Frontend health check
+            def frontendHealthy = false
+            for (int i = 1; i <= 10; i++) {
+                try {
+                    sh "curl -f http://${hostIp}:3000"  // Use host IP instead of localhost
+                    echo "✅ Frontend is accessible"
+                    frontendHealthy = true
+                    break
+                } catch (Exception e) {
+                    echo "⚠️ Frontend check attempt ${i}/10 failed, retrying..."
+                    if (i == 10) {
+                        error "❌ Frontend check failed after 10 attempts"
+                    }
+                    sleep(10)
                 }
             }
         }
