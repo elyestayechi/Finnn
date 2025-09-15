@@ -121,9 +121,8 @@ EOF
                 sh '''
                 echo "=== Deploying application services only ==="
                 
-                # Create a custom compose file without Jenkins
+                # Create a custom compose file without Jenkins and without loans_vector.db mount
                 cat > docker-compose.app.yml << 'EOF'
-version: '3.8'
 services:
   ollama:
     image: ollama/ollama:latest
@@ -142,7 +141,6 @@ services:
     volumes:
       - ./Back/Data:/app/Data
       - ./Back/PDF Loans:/app/PDF Loans
-      - ./Back/loans_vector.db:/app/loans_vector.db
       - ./Back/loan_analysis.db:/app/loan_analysis.db
     environment:
       - PYTHONPATH=/app
@@ -235,19 +233,16 @@ EOF
                 script {
                     echo "=== Running data migration ==="
                     
-                        
-                        try {
-                            sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                            echo "✅ Data migration completed successfully!"
-                        } catch (Exception e) {
-                            echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
-                            echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                        }
-                    
+                    try {
+                        sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                        echo "✅ Data migration completed successfully!"
+                    } catch (Exception e) {
+                        echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
+                        echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                    }
                 }
             }
         }
-
     }
     
     post {
