@@ -44,39 +44,30 @@ pipeline {
         }
         
         stage('Run Tests') {
-            steps {
-                dir('Back') {
-                    sh '''
-                    echo "=== Running unit tests ==="
-                    docker build -t finn-backend-test:${BUILD_ID} -f Dockerfile.test .
-                    
-                    # Run tests and capture output
-                    docker run --rm \
-                        -v "$(pwd)/test-results:/app/test-results" \
-                        -v "$(pwd)/coverage:/app/coverage" \
-                        -e OLLAMA_HOST=http://dummy:11434 \
-                        finn-backend-test:${BUILD_ID} || true
-                    
-                    # Verify test results were created
-                    echo "=== Checking test results ==="
-                    if [ -d "test-results" ]; then
-                        echo "Test results directory exists"
-                        ls -la test-results/
-                        if [ -f "test-results/test-results.xml" ]; then
-                            echo "✅ Test results XML found"
-                        else
-                            echo "❌ Test results XML not found, creating placeholder"
-                            echo '<?xml version="1.0" encoding="UTF-8"?><testsuite name="pytest" tests="7" errors="0" failures="0" skipped="0"></testsuite>' > test-results/test-results.xml
-                        fi
-                    else
-                        echo "❌ Test results directory not found, creating it"
-                        mkdir -p test-results
-                        echo '<?xml version="1.0" encoding="UTF-8"?><testsuite name="pytest" tests="7" errors="0" failures="0" skipped="0"></testsuite>' > test-results/test-results.xml
-                    fi
-                    '''
-                }
-            }
+    steps {
+        dir('Back') {
+            sh '''
+            echo "=== Running unit tests ==="
+            docker build -t finn-backend-test:${BUILD_ID} -f Dockerfile.test .
+            
+            # Run tests and debug the volume mount
+            echo "Current directory: $(pwd)"
+            echo "Test results path: $(pwd)/test-results/"
+            ls -la test-results/ 2>/dev/null || echo "test-results directory doesn't exist yet"
+            
+            docker run --rm \
+                -v "$(pwd)/test-results:/app/test-results" \
+                -v "$(pwd)/coverage:/app/coverage" \
+                -e OLLAMA_HOST=http://dummy:11434 \
+                finn-backend-test:${BUILD_ID} || true
+            
+            # Debug: Check what was created
+            echo "=== After test execution ==="
+            ls -la test-results/ 2>/dev/null || echo "test-results still doesn't exist"
+            '''
         }
+    }
+}
         
         stage('Clean Previous Deployment') {
             steps {
