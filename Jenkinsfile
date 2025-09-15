@@ -5,7 +5,8 @@ pipeline {
         COMPOSE_PROJECT_NAME = "finn-${BUILD_ID}"
         PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
         LOCAL_DATA_PATH = "/Users/asmatayechi/Desktop/Finn"
-        PDF_LOANS_DIR = "PDF Loans"  // Handle spaces consistently
+        PDF_LOANS_DIR = "PDF Loans"
+        WORKSPACE = "${env.WORKSPACE}"  // Use Jenkins workspace
     }
 
     stages {
@@ -72,41 +73,25 @@ pipeline {
             }
         }
 
-        stage('Run Migration Before Deployment') {
+        stage('Run Migration & Deploy') {
             steps {
                 dir('Back') {
                     sh '''
-                    echo "=== Running migration in temporary container ==="
+                    echo "=== Ensuring directories exist with proper permissions ==="
+                    mkdir -p Data "${PDF_LOANS_DIR}"
+                    chmod 777 Data "${PDF_LOANS_DIR}"
                     
-                    # Ensure directories exist with proper permissions
-                    mkdir -p Data "PDF Loans"
-                    chmod 777 Data "PDF Loans"
-                    
-                    # Run migration with proper volume mounting
-                    docker run --rm \
-                        -v "$(pwd)/Data:/app/Data" \
-                        -v "$(pwd)/${PDF_LOANS_DIR}:/app/PDF Loans" \
-                        -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
-                        -e OLLAMA_HOST=http://dummy:11434 \
-                        finn-backend:${BUILD_ID} \
-                        python migrate_data.py
-
-                    # Verify migration results
-                    echo "=== After migration, host volumes ==="
-                    ls -la Data/ | head -10
-                    ls -la "${PDF_LOANS_DIR}/" | head -10
-                    ls -la loan_analysis.db
-                    echo "✅ Host volumes populated with data"
+                    # Verify what's in the directories before migration
+                    echo "=== Before migration ==="
+                    ls -la Data/ | head -5
+                    ls -la "${PDF_LOANS_DIR}/" | head -5
+                    ls -la loan_analysis.db 2>/dev/null || echo "No DB file yet"
                     '''
                 }
-            }
-        }
-
-        stage('Deploy Application') {
-            steps {
-                sh '''
-                WORKSPACE="$(pwd)"
-                cat > docker-compose.app.yml << EOF
+                
+                script {
+                    // Create docker-compose file that includes migration as a service
+                    writeFile file: 'docker-compose.app.yml', text: """
 version: '3.8'
 services:
   ollama:
@@ -119,19 +104,31 @@ services:
       - OLLAMA_HOST=0.0.0.0:11434
     restart: unless-stopped
 
+  migration:
+    image: finn-backend:${env.BUILD_ID}
+    volumes:
+      - ${env.WORKSPACE}/Back/Data:/app/Data
+      - "${env.WORKSPACE}/Back/${env.PDF_LOANS_DIR}:/app/PDF Loans"
+      - ${env.WORKSPACE}/Back/loan_analysis.db:/app/loan_analysis.db
+    environment:
+      - OLLAMA_HOST=http://dummy:11434
+    command: python migrate_data.py
+    restart: "no"
+
   backend:
-    image: finn-backend:${BUILD_ID}
+    image: finn-backend:${env.BUILD_ID}
     ports:
       - "8000:8000"
     volumes:
-      - ${WORKSPACE}/Back/Data:/app/Data
-      - "${WORKSPACE}/Back/${PDF_LOANS_DIR}:/app/PDF Loans"
-      - ${WORKSPACE}/Back/loan_analysis.db:/app/loan_analysis.db
+      - ${env.WORKSPACE}/Back/Data:/app/Data
+      - "${env.WORKSPACE}/Back/${env.PDF_LOANS_DIR}:/app/PDF Loans"
+      - ${env.WORKSPACE}/Back/loan_analysis.db:/app/loan_analysis.db
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
     depends_on:
       - ollama
+      - migration
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -141,21 +138,36 @@ services:
       start_period: 60s
 
   frontend:
-    image: finn-frontend:${BUILD_ID}
+    image: finn-frontend:${env.BUILD_ID}
     ports:
       - "3000:3000"
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000  # Changed for frontend accessibility
+      - VITE_API_BASE_URL=http://backend:8000
     restart: unless-stopped
 
 volumes:
   ollama_data:
-EOF
-
-                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-                echo "✅ Application deployed with pre-populated data"
+"""
+                }
+                
+                sh '''
+                echo "=== Running migration and deployment ==="
+                
+                # First run just the migration service to populate data
+                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up migration --exit-code-from migration
+                
+                # Verify migration results
+                echo "=== After migration, host volumes ==="
+                ls -la Back/Data/ | head -10
+                ls -la "Back/${PDF_LOANS_DIR}/" | head -10
+                ls -la Back/loan_analysis.db
+                
+                # Now start the full application
+                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d --scale migration=0
+                
+                echo "✅ Application deployed with migrated data"
                 '''
             }
         }
@@ -168,7 +180,15 @@ EOF
                 docker compose -p ${COMPOSE_PROJECT_NAME} ps
                 
                 echo "=== Testing backend health ==="
-                curl -f http://localhost:8000/health || echo "Backend health check failed"
+                for i in {1..10}; do
+                    if curl -f http://localhost:8000/health; then
+                        echo "✅ Backend is healthy"
+                        break
+                    else
+                        echo "⏳ Waiting for backend to be ready (attempt $i/10)"
+                        sleep 10
+                    fi
+                done
                 '''
             }
         }
@@ -177,7 +197,7 @@ EOF
     post {
         always {
             sh '''
-            echo "=== Ensuring directories exist ==="
+            echo "=== Ensuring test result directories exist ==="
             mkdir -p Back/test-results Back/coverage
             
             # Create placeholder files if they don't exist
@@ -218,5 +238,7 @@ EOF
             docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
             '''
         }
+        
+       
     }
 }
