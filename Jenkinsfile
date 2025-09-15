@@ -178,45 +178,6 @@ EOF
             }
         }
         
-        // NEW STAGE: Data Migration
-        stage('Run Data Migration') {
-            steps {
-                script {
-                    echo "=== Running data migration ==="
-                    
-                    // Wait for backend to be fully healthy
-                    def backendHealthy = false
-                    for (int i = 1; i <= 15; i++) {
-                        try {
-                            def healthStatus = sh(script: "curl -s -f http://localhost:8000/health", returnStdout: true).trim()
-                            if (healthStatus.contains("healthy") || healthStatus.contains("OK")) {
-                                echo "✅ Backend health check passed: ${healthStatus}"
-                                backendHealthy = true
-                                break
-                            }
-                        } catch (Exception e) {
-                            echo "⚠️ Backend not ready yet, attempt ${i}/15"
-                            if (i == 15) {
-                                error "❌ Backend failed to become healthy for migration"
-                            }
-                            sleep(10)
-                        }
-                    }
-                    
-                    if (backendHealthy) {
-                        // Run the migration script inside the backend container
-                        try {
-                            sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                            echo "✅ Data migration completed successfully!"
-                        } catch (Exception e) {
-                            echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
-                            echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                        }
-                    }
-                }
-            }
-        }
-        
         stage('Health Check') {
             steps {
                 script {
@@ -268,6 +229,46 @@ EOF
                 }
             }
         }
+
+        stage('Run Data Migration') {
+            steps {
+                script {
+                    echo "=== Running data migration ==="
+                    
+                    // Wait for backend to be fully healthy
+                    def backendHealthy = false
+                    for (int i = 1; i <= 15; i++) {
+                        try {
+                            def healthStatus = sh(script: "curl -s -f http://localhost:8000/health", returnStdout: true).trim()
+                            if (healthStatus.contains("healthy") || healthStatus.contains("OK")) {
+                                echo "✅ Backend health check passed: ${healthStatus}"
+                                backendHealthy = true
+                                break
+                            }
+                        } catch (Exception e) {
+                            echo "⚠️ Backend not ready yet, attempt ${i}/15"
+                            if (i == 15) {
+                                error "❌ Backend failed to become healthy for migration"
+                            }
+                            sleep(10)
+                        }
+                    }
+                    
+                    if (backendHealthy) {
+                        // Run the migration script inside the backend container
+                        try {
+                            sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                            echo "✅ Data migration completed successfully!"
+                        } catch (Exception e) {
+                            echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
+                            echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                        }
+                    }
+                }
+            }
+        }
+
+
     }
     
     post {
