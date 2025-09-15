@@ -117,12 +117,12 @@ EOF
         }
         
         stage('Deploy Application Only') {
-            steps {
-                sh '''
-                echo "=== Deploying application services only ==="
-                
-                # Create a custom compose file without Jenkins and without loans_vector.db mount
-                cat > docker-compose.app.yml << 'EOF'
+    steps {
+        sh '''
+        echo "=== Deploying application services only ==="
+        
+        # Create a custom compose file without Jenkins
+        cat > docker-compose.app.yml << 'EOF'
 services:
   ollama:
     image: ollama/ollama:latest
@@ -141,7 +141,7 @@ services:
     volumes:
       - ./Back/Data:/app/Data
       - ./Back/PDF Loans:/app/PDF Loans
-      - ./Back/loan_analysis.db:/app/loan_analysis.db
+      - ./Back/loan_analysis.db:/app/Data/loan_analysis.db  # FIXED THIS LINE!
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
@@ -166,15 +166,15 @@ services:
 volumes:
   ollama_data:
 EOF
-                
-                # Deploy only application services
-                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-                
-                echo "=== Waiting for services to start ==="
-                sleep 30
-                '''
-            }
-        }
+        
+        # Deploy only application services
+        docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
+        
+        echo "=== Waiting for services to start ==="
+        sleep 30
+        '''
+    }
+}
         
         stage('Health Check') {
             steps {
