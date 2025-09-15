@@ -116,12 +116,15 @@ EOF
             }
         }
 
-stage('Deploy Application Only') {
-    steps {
-        sh '''
-        echo "=== Deploying application services only ==="
-
-        cat > docker-compose.app.yml << 'EOF'
+        stage('Deploy Application Only') {
+            steps {
+                sh '''
+                echo "=== Deploying application services only ==="
+                
+                # Get absolute path to workspace
+                WORKSPACE_PATH="$(pwd)"
+                
+                cat > docker-compose.app.yml << EOF
 services:
   ollama:
     image: ollama/ollama:latest
@@ -138,9 +141,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./Back/Data:/app/Data
-      - ./Back/PDF Loans:/app/PDF Loans
-      - ./Back/loan_analysis.db:/app/loan_analysis.db  # DIRECTORY MOUNT (not file)
+      - ${WORKSPACE_PATH}/Back/Data:/app/Data
+      - "${WORKSPACE_PATH}/Back/PDF Loans:/app/PDF Loans"
+      - ${WORKSPACE_PATH}/Back/loan_analysis.db:/app/loan_analysis.db
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
@@ -166,44 +169,45 @@ volumes:
   ollama_data:
 EOF
 
-        docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-        echo "✅ Services deployed with directory mount"
-        '''
-    }
-}
-
-stage('Run Data Migration') {
-    steps {
-        script {
-            echo "=== Running data migration ==="
-            
-            // Wait for backend to be ready
-            for (int i = 1; i <= 15; i++) {
-                try {
-                    def status = sh(script: "docker compose -p ${COMPOSE_PROJECT_NAME} ps backend --format '{{.Status}}'", returnStdout: true).trim()
-                    if (status.contains("Up") && !status.contains("Exit") && !status.contains("unhealthy")) {
-                        echo "✅ Backend ready for migration"
-                        break
-                    }
-                } catch (Exception e) {
-                    echo "⚠️ Waiting for backend, attempt ${i}/15"
-                    if (i == 15) {
-                        error "❌ Backend not ready for migration"
-                    }
-                    sleep(5)
-                }
-            }
-            
-            // Run migration in the actual container
-            try {
-                sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                echo "✅ Data migration completed!"
-            } catch (Exception e) {
-                echo "⚠️ Data migration failed: ${e.message}"
+                
+                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
+                echo "✅ Services deployed with absolute path mounts"
+                '''
             }
         }
-    }
-}
+
+        stage('Run Data Migration') {
+            steps {
+                script {
+                    echo "=== Running data migration ==="
+                    
+                    // Wait for backend to be ready
+                    for (int i = 1; i <= 15; i++) {
+                        try {
+                            def status = sh(script: "docker compose -p ${COMPOSE_PROJECT_NAME} ps backend --format '{{.Status}}'", returnStdout: true).trim()
+                            if (status.contains("Up") && !status.contains("Exit") && !status.contains("unhealthy")) {
+                                echo "✅ Backend ready for migration"
+                                break
+                            }
+                        } catch (Exception e) {
+                            echo "⚠️ Waiting for backend, attempt ${i}/15"
+                            if (i == 15) {
+                                error "❌ Backend not ready for migration"
+                            }
+                            sleep(5)
+                        }
+                    }
+                    
+                    // Run migration in the actual container
+                    try {
+                        sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                        echo "✅ Data migration completed!"
+                    } catch (Exception e) {
+                        echo "⚠️ Data migration failed: ${e.message}"
+                    }
+                }
+            }
+        }
         
         stage('Health Check') {
             steps {
@@ -256,7 +260,6 @@ stage('Run Data Migration') {
                 }
             }
         }
-
     }
     
     post {
@@ -277,7 +280,6 @@ stage('Run Data Migration') {
             // Use specific file paths instead of wildcards
             junit 'Back/test-results/test-results.xml'
             archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
-            
         }
 
         success {
