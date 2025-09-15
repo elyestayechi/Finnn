@@ -160,7 +160,7 @@ services:
       - backend
     environment:
       - VITE_API_BASE_URL=http://backend:8000
-    restart: unless极opped
+    restart: unless-stopped
 
 volumes:
   ollama_data:
