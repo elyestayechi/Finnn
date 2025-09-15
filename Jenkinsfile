@@ -116,12 +116,36 @@ EOF
             }
         }
         
-        stage('Deploy Application Only') {
+        stage('Prepare Data') {
+    steps {
+        dir('Back') {
+            sh '''
+            echo "=== Running data migration BEFORE deployment ==="
+
+            # Ensure host volume directories exist
+            mkdir -p ./Data
+            touch ./loan_analysis.db
+
+            # Run migration in a temporary container
+            docker run --rm \
+                -v "$(pwd)/Data:/app/Data" \
+                -v "$(pwd)/PDF Loans:/app/PDF Loans" \
+                -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
+                -e OLLAMA_HOST=http://dummy:11434 \
+                finn-backend-test:${BUILD_ID} \
+                python migrate_data.py
+
+            echo "✅ Migration completed and host volumes populated"
+            '''
+        }
+    }
+}
+
+stage('Deploy Application Only') {
     steps {
         sh '''
-        echo "=== Deploying application services only ==="
+        echo "=== Deploying application with pre-populated data ==="
 
-        # Use correct volume mapping (host directories)
         cat > docker-compose.app.yml << 'EOF'
 version: '3.8'
 services:
@@ -168,11 +192,8 @@ volumes:
   ollama_data:
 EOF
 
-        # Deploy only application services
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-
-        echo "=== Waiting for services to start ==="
-        sleep 30
+        echo "✅ Services deployed"
         '''
 }
 }
