@@ -236,13 +236,17 @@ EOF
         // Debug test results location
         sh '''
         echo "=== Final test results check ==="
+        echo "Looking for XML files:"
         find . -name "*.xml" -type f
-        ls -la Back/test-results/ || true
-        ls -la Back/coverage/ || true
+        echo "Test results directory:"
+        ls -la Back/test-results/ || echo "test-results directory not found"
+        echo "Coverage directory:"
+        ls -la Back/coverage/ || echo "coverage directory not found"
         '''
         
-        junit 'Back/test-results/*.xml'
-        archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
+        // Fix the paths - remove the extra "Back/" since we're at root level
+        junit 'test-results/*.xml'
+        archiveArtifacts artifacts: 'coverage/*.xml', fingerprint: true
         
         // Clean up
         sh '''
