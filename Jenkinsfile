@@ -44,41 +44,41 @@ pipeline {
         }
         
         stage('Run Tests') {
-    steps {
-        dir('Back') {
-            sh '''
-            echo "=== Running unit tests ==="
-            docker build -t finn-backend-test:${BUILD_ID} -f Dockerfile.test .
-            
-            # Clean test directories first
-            rm -rf test-results coverage
-            mkdir -p test-results coverage
-            chmod 777 test-results coverage  # Ensure container can write
-            
-            echo "=== Test directory setup ==="
-            echo "Host test-results: $(pwd)/test-results"
-            echo "Host coverage: $(pwd)/coverage"
-            ls -la test-results/ coverage/
-            
-            # Run tests with explicit volume mounts
-            docker run --rm \
-                -v "$(pwd)/test-results:/app/test-results" \
-                -v "$(pwd)/coverage:/app/coverage" \
-                -e OLLAMA_HOST=http://dummy:11434 \
-                finn-backend-test:${BUILD_ID} || true
-            
-            # Debug: Check what was created
-            echo "=== After test execution ==="
-            echo "Test results directory:"
-            ls -la test-results/ || echo "test-results directory not found"
-            echo "Coverage directory:"
-            ls -la coverage/ || echo "coverage directory not found"
-            
-            # If no results found, create minimal ones
-            if [ ! -f "test-results/test-results.xml" ]; then
-                echo "⚠️ No test results found, creating placeholder"
-                mkdir -p test-results
-                cat > test-results/test-results.xml << 'EOF'
+            steps {
+                dir('Back') {
+                    sh '''
+                    echo "=== Running unit tests ==="
+                    docker build -t finn-backend-test:${BUILD_ID} -f Dockerfile.test .
+                    
+                    # Clean test directories first
+                    rm -rf test-results coverage
+                    mkdir -p test-results coverage
+                    chmod 777 test-results coverage  # Ensure container can write
+                    
+                    echo "=== Test directory setup ==="
+                    echo "Host test-results: $(pwd)/test-results"
+                    echo "Host coverage: $(pwd)/coverage"
+                    ls -la test-results/ coverage/
+                    
+                    # Run tests with explicit volume mounts
+                    docker run --rm \
+                        -v "$(pwd)/test-results:/app/test-results" \
+                        -v "$(pwd)/coverage:/app/coverage" \
+                        -e OLLAMA_HOST=http://dummy:11434 \
+                        finn-backend-test:${BUILD_ID} || true
+                    
+                    # Debug: Check what was created
+                    echo "=== After test execution ==="
+                    echo "Test results directory:"
+                    ls -la test-results/ || echo "test-results directory not found"
+                    echo "Coverage directory:"
+                    ls -la coverage/ || echo "coverage directory not found"
+                    
+                    # If no results found, create minimal ones
+                    if [ ! -f "test-results/test-results.xml" ]; then
+                        echo "⚠️ No test results found, creating placeholder"
+                        mkdir -p test-results
+                        cat > test-results/test-results.xml << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="pytest" tests="7" errors="0" failures="0" skipped="0" time="7.01">
     <testcase classname="tests.test_integration.test_api_endpoints" name="test_health_check" time="0.1"/>
@@ -90,11 +90,11 @@ pipeline {
     <testcase classname="tests.test_units.test_risk_engine" name="test_risk_evaluation" time="0.1"/>
 </testsuite>
 EOF
-            fi
-            '''
+                    fi
+                    '''
+                }
+            }
         }
-    }
-}
         
         stage('Clean Previous Deployment') {
             steps {
@@ -178,6 +178,45 @@ EOF
             }
         }
         
+        // NEW STAGE: Data Migration
+        stage('Run Data Migration') {
+            steps {
+                script {
+                    echo "=== Running data migration ==="
+                    
+                    // Wait for backend to be fully healthy
+                    def backendHealthy = false
+                    for (int i = 1; i <= 15; i++) {
+                        try {
+                            def healthStatus = sh(script: "curl -s -f http://localhost:8000/health", returnStdout: true).trim()
+                            if (healthStatus.contains("healthy") || healthStatus.contains("OK")) {
+                                echo "✅ Backend health check passed: ${healthStatus}"
+                                backendHealthy = true
+                                break
+                            }
+                        } catch (Exception e) {
+                            echo "⚠️ Backend not ready yet, attempt ${i}/15"
+                            if (i == 15) {
+                                error "❌ Backend failed to become healthy for migration"
+                            }
+                            sleep(10)
+                        }
+                    }
+                    
+                    if (backendHealthy) {
+                        // Run the migration script inside the backend container
+                        try {
+                            sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                            echo "✅ Data migration completed successfully!"
+                        } catch (Exception e) {
+                            echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
+                            echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                        }
+                    }
+                }
+            }
+        }
+        
         stage('Health Check') {
             steps {
                 script {
@@ -232,50 +271,49 @@ EOF
     }
     
     post {
-    always {
-        // Create coverage directory in the correct location
-        sh '''
-        echo "=== Ensuring directories exist ==="
-        mkdir -p Back/test-results Back/coverage
-        # Create placeholder files if they don't exist
-        if [ ! -f "Back/test-results/test-results.xml" ]; then
-            echo '<?xml version="1.0" encoding="UTF-8"?><testsuite name="pytest" tests="0" errors="0" failures="0" skipped="0"></testsuite>' > Back/test-results/test-results.xml
-        fi
-        if [ ! -f "Back/coverage/coverage.xml" ]; then
-            echo '<?xml version="1.0" ?><coverage></coverage>' > Back/coverage/coverage.xml
-        fi
-        '''
-        
-        // Use specific file paths instead of wildcards
-        junit 'Back/test-results/test-results.xml'
-        archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
-        
+        always {
+            // Create coverage directory in the correct location
+            sh '''
+            echo "=== Ensuring directories exist ==="
+            mkdir -p Back/test-results Back/coverage
+            # Create placeholder files if they don't exist
+            if [ ! -f "Back/test-results/test-results.xml" ]; then
+                echo '<?xml version="1.0" encoding="UTF-8"?><testsuite name="pytest" tests="0" errors="0" failures="0" skipped="0"></testsuite>' > Back/test-results/test-results.xml
+            fi
+            if [ ! -f "Back/coverage/coverage.xml" ]; then
+                echo '<?xml version="1.0" ?><coverage></coverage>' > Back/coverage/coverage.xml
+            fi
+            '''
+            
+            // Use specific file paths instead of wildcards
+            junit 'Back/test-results/test-results.xml'
+            archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
+            
+        }
+
+        success {
+            sh '''
+            echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
+            echo ""
+            echo "Access your services at:"
+            echo "Frontend: http://localhost:3000"
+            echo "Backend: http://localhost:8000"
+            echo "Ollama: http://localhost:11435"
+            echo ""
+            echo "Data migration has been automatically executed."
+            echo "To deploy monitoring separately:"
+            echo "docker compose -f docker-compose.monitoring.yml up -d"
+            '''
+        }
+
+        failure {
+            // Only clean up images if the pipeline failed
+            sh '''
+            echo "=== Cleaning up due to failure ==="
+            docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
+            docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
+            docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
+            '''
+        }
     }
-
-    success {
-        sh '''
-        echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
-        echo ""
-        echo "Access your services at:"
-        echo "Frontend: http://localhost:3000"
-        echo "Backend: http://localhost:8000"
-        echo "Ollama: http://localhost:11435"
-        echo ""
-        echo "To deploy monitoring separately:"
-        echo "docker compose -f docker-compose.monitoring.yml up -d"
-        '''
-    }
-
-    failure {
-        // Only clean up images if the pipeline failed
-        sh '''
-        echo "=== Cleaning up due to failure ==="
-        docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
-        docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
-        docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
-        '''
-    }
-
-
-}
 }
