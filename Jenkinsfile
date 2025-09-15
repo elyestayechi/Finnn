@@ -175,6 +175,7 @@ EOF
         sleep 30
         '''
 }
+}
         
         stage('Health Check') {
             steps {
