@@ -122,10 +122,10 @@ EOF
             sh '''
             echo "=== Preparing database file ==="
             
-            # Create the directory if it doesn't exist
-            mkdir -p loan_analysis.db
+            # Create directory (ignore if already exists)
+            mkdir -p loan_analysis.db 2>/dev/null || true
             
-            # Create the actual SQLite database file
+            # Create the database file
             touch loan_analysis.db/finn_database.db
             
             echo "✅ Database file created: loan_analysis.db/finn_database.db"
