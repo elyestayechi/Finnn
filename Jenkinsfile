@@ -120,13 +120,10 @@ EOF
     steps {
         sh '''
         echo "=== Deploying application services only ==="
-        
-        # Get the absolute workspace path
-        WORKSPACE_PATH=$(pwd)
-        echo "Workspace path: ${WORKSPACE_PATH}"
-        
-        # Create a custom compose file with absolute paths
-        cat > docker-compose.app.yml << EOF
+
+        # Use correct volume mapping (host directories)
+        cat > docker-compose.app.yml << 'EOF'
+version: '3.8'
 services:
   ollama:
     image: ollama/ollama:latest
@@ -143,9 +140,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ${WORKSPACE_PATH}/Back/Data:/app/Data
-      - ${WORKSPACE_PATH}/Back/PDF Loans:/app/PDF Loans
-      - ${WORKSPACE_PATH}/Back/loan_analysis.db:/app/loan_analysis.db
+      - ./Back/Data:/app/Data
+      - ./Back/PDF Loans:/app/PDF Loans
+      - ./Back/loan_analysis.db:/app/loan_analysis.db
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
@@ -170,17 +167,13 @@ services:
 volumes:
   ollama_data:
 EOF
-        
-        echo "=== Docker Compose File ==="
-        cat docker-compose.app.yml
-        
+
         # Deploy only application services
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-        
+
         echo "=== Waiting for services to start ==="
         sleep 30
         '''
-    }
 }
         
         stage('Health Check') {
