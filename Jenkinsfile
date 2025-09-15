@@ -232,45 +232,46 @@ EOF
     }
     
     post {
-        always {
-            // Debug test results location
-            sh '''
-            echo "=== Final test results check ==="
-            find . -name "*.xml" -type f
-            ls -la Back/test-results/ || true
-            '''
-            
-            junit 'Back/test-results/*.xml'
-            archiveArtifacts artifacts: 'Back/coverage/*.xml', fingerprint: true
-            
-            // Clean up
-            sh '''
-            echo "=== Cleaning up ==="
-            docker compose -p ${COMPOSE_PROJECT_NAME} down -v 2>/dev/null || true
-            '''
-        }
+    always {
+        // Debug test results location
+        sh '''
+        echo "=== Final test results check ==="
+        find . -name "*.xml" -type f
+        ls -la Back/test-results/ || true
+        ls -la Back/coverage/ || true
+        '''
         
-        success {
-            sh '''
-            echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
-            echo ""
-            echo "Access your services at:"
-            echo "Frontend: http://localhost:3000"
-            echo "Backend: http://localhost:8000"
-            echo "Ollama: http://localhost:11435"
-            echo ""
-            echo "To deploy monitoring separately:"
-            echo "docker compose -f docker-compose.monitoring.yml up -d"
-            '''
-        }
+        junit 'Back/test-results/*.xml'
+        archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
         
-        cleanup {
-            sh '''
-            # Clean up images
-            docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
-            docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
-            docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
-            '''
-        }
+        // Clean up
+        sh '''
+        echo "=== Cleaning up ==="
+        docker compose -p ${COMPOSE_PROJECT_NAME} down -v 2>/dev/null || true
+        '''
     }
+    
+    success {
+        sh '''
+        echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
+        echo ""
+        echo "Access your services at:"
+        echo "Frontend: http://localhost:3000"
+        echo "Backend: http://localhost:8000"
+        echo "Ollama: http://localhost:11435"
+        echo ""
+        echo "To deploy monitoring separately:"
+        echo "docker compose -f docker-compose.monitoring.yml up -d"
+        '''
+    }
+    
+    cleanup {
+        sh '''
+        # Clean up images
+        docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
+        docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
+        docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
+        '''
+    }
+}
 }
