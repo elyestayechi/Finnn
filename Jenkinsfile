@@ -270,13 +270,6 @@ EOF
         '''
     }
 
-    cleanup {
-        sh '''
-        # Clean up images
-        docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
-        docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
-        docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
-        '''
-    }
+    
 }
 }
