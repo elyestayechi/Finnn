@@ -141,7 +141,7 @@ services:
     volumes:
       - ./Back/Data:/app/Data
       - ./Back/PDF Loans:/app/PDF Loans
-      - ./Back/loan_analysis.db:/app/Data/loan_analysis.db  # FIXED THIS LINE!
+     
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
