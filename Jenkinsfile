@@ -17,8 +17,7 @@ pipeline {
                 ls -la
                 mkdir -p Back/test-results Back/coverage
                 chmod 755 Back/test-results Back/coverage
-                echo "Workspace structure:"
-                find . -name "*.py" -o -name "Dockerfile*" -o -name "requirements.txt" | head -10
+                echo "Workspace prepared"
                 '''
             }
         }
@@ -74,42 +73,29 @@ pipeline {
             }
         }
         
-        stage('Deploy Application') {
+        stage('Clean Previous Deployment') {
             steps {
                 sh '''
-                echo "=== Cleaning up previous deployment ==="
-                # Clean up any existing containers
-                docker ps -aq --filter "name=${COMPOSE_PROJECT_NAME}" | xargs -r docker rm -f 2>/dev/null || true
+                echo "=== Cleaning previous deployment (excluding Jenkins) ==="
                 
-                # Free up ports
-                for port in 8000 3000 11435; do
-                    docker ps -q --filter "publish=$port" | xargs -r docker rm -f 2>/dev/null || true
-                done
+                # Scale Jenkins to 0 and bring everything else down
+                docker compose -p ${COMPOSE_PROJECT_NAME} scale jenkins=0 2>/dev/null || true
+                docker compose -p ${COMPOSE_PROJECT_NAME} down --remove-orphans 2>/dev/null || true
                 
                 sleep 2
+                echo "Cleanup completed"
+                '''
+            }
+        }
+        
+        stage('Deploy Full Stack') {
+            steps {
+                sh '''
+                echo "=== Deploying full stack (excluding Jenkins) ==="
                 
-                echo "=== Deploying application stack ==="
-                # Use your existing docker-compose.yml but with build images
-                docker compose -p ${COMPOSE_PROJECT_NAME} down -v 2>/dev/null || true
-                
-                # Create override for built images
-                cat > docker-compose.override.yml << 'EOF'
-version: '3.8'
-services:
-  backend:
-    image: finn-backend:${BUILD_ID}
-    build: 
-      context: ./Back
-      dockerfile: Dockerfile
-  
-  frontend:
-    image: finn-frontend:${BUILD_ID}
-    build:
-      context: ./Front
-      dockerfile: Dockerfile
-EOF
-                
-                docker compose -p ${COMPOSE_PROJECT_NAME} up -d --build
+                # Scale Jenkins to 0 and deploy everything else
+                docker compose -p ${COMPOSE_PROJECT_NAME} scale jenkins=0
+                docker compose -p ${COMPOSE_PROJECT_NAME} up -d --build --scale jenkins=0
                 
                 echo "=== Waiting for services to start ==="
                 sleep 30
@@ -154,6 +140,15 @@ EOF
                     fi
                 done
                 
+                # Optional: Check monitoring services
+                for service in prometheus grafana alertmanager; do
+                    if docker compose -p ${COMPOSE_PROJECT_NAME} ps | grep -q "$service.*Up"; then
+                        echo "✅ $service is running"
+                    else
+                        echo "⚠️ $service is not running (optional service)"
+                    fi
+                done
+                
                 echo "✅ All application services are running"
                 '''
             }
@@ -168,15 +163,18 @@ EOF
         
         success {
             sh '''
-            echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
+            echo "🎉 FULL STACK DEPLOYMENT SUCCESSFUL! 🎉"
             echo ""
             echo "Access your services at:"
             echo "Frontend: http://localhost:3000"
             echo "Backend: http://localhost:8000"
             echo "Ollama: http://localhost:11435"
+            echo "Prometheus: http://localhost:9090"
+            echo "Grafana: http://localhost:3001 (admin/admin)"
+            echo "Alertmanager: http://localhost:9093"
             echo ""
-            echo "To deploy monitoring (optional):"
-            echo "docker compose -f docker-compose.monitoring.yml up -d"
+            echo "To deploy Jenkins separately:"
+            echo "docker compose -p ${COMPOSE_PROJECT_NAME} up -d jenkins"
             '''
         }
         
