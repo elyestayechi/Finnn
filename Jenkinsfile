@@ -235,21 +235,6 @@ EOF
             }
         }
 
-        stage('Run Data Migration') {
-            steps {
-                script {
-                    echo "=== Running data migration ==="
-                    
-                    try {
-                        sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                        echo "✅ Data migration completed successfully!"
-                    } catch (Exception e) {
-                        echo "⚠️ Data migration failed, but continuing deployment: ${e.message}"
-                        echo "Note: You may need to run migration manually: docker exec -it \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
-                    }
-                }
-            }
-        }
     }
     
     post {
