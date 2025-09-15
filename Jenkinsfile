@@ -13,8 +13,6 @@ pipeline {
                 
                 sh '''
                 echo "=== Preparing workspace ==="
-                pwd
-                ls -la
                 mkdir -p Back/test-results Back/coverage
                 chmod 755 Back/test-results Back/coverage
                 echo "Workspace prepared"
@@ -50,24 +48,13 @@ pipeline {
                 dir('Back') {
                     sh '''
                     echo "=== Running unit tests ==="
-                    # Build test image
                     docker build -t finn-backend-test:${BUILD_ID} -f Dockerfile.test .
                     
-                    # Run tests with proper volume mounts
                     docker run --rm \
                         -v "$(pwd)/test-results:/app/test-results" \
                         -v "$(pwd)/coverage:/app/coverage" \
                         -e OLLAMA_HOST=http://dummy:11434 \
                         finn-backend-test:${BUILD_ID} || true
-                    
-                    # Check if test results exist
-                    if [ -f "test-results/test-results.xml" ]; then
-                        echo "Test results found"
-                    else
-                        echo "No test results found, creating placeholder"
-                        mkdir -p test-results
-                        echo '<?xml version="1.0" encoding="UTF-8"?><testsuite name="pytest" tests="0" errors="0" failures="0" skipped="0"></testsuite>' > test-results/test-results.xml
-                    fi
                     '''
                 }
             }
@@ -76,11 +63,16 @@ pipeline {
         stage('Clean Previous Deployment') {
             steps {
                 sh '''
-                echo "=== Cleaning previous deployment (excluding Jenkins) ==="
+                echo "=== Force cleaning previous deployment ==="
                 
-                # Scale Jenkins to 0 and bring everything else down
-                docker compose -p ${COMPOSE_PROJECT_NAME} scale jenkins=0 2>/dev/null || true
-                docker compose -p ${COMPOSE_PROJECT_NAME} down --remove-orphans 2>/dev/null || true
+                # Remove any existing containers using our ports
+                for port in 8000 3000 11435 9090 9093 3001; do
+                    echo "Freeing port $port..."
+                    docker ps -q --filter "publish=$port" | xargs -r docker rm -f 2>/dev/null || true
+                done
+                
+                # Clean up any project containers
+                docker compose -p ${COMPOSE_PROJECT_NAME} down -v --remove-orphans 2>/dev/null || true
                 
                 sleep 2
                 echo "Cleanup completed"
@@ -88,14 +80,61 @@ pipeline {
             }
         }
         
-        stage('Deploy Full Stack') {
+        stage('Deploy Application Only') {
             steps {
                 sh '''
-                echo "=== Deploying full stack (excluding Jenkins) ==="
+                echo "=== Deploying application services only ==="
                 
-                # Scale Jenkins to 0 and deploy everything else
-                docker compose -p ${COMPOSE_PROJECT_NAME} scale jenkins=0
-                docker compose -p ${COMPOSE_PROJECT_NAME} up -d --build --scale jenkins=0
+                # Create a custom compose file without Jenkins
+                cat > docker-compose.app.yml << 'EOF'
+version: '3.8'
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    restart: unless-stopped
+
+  backend:
+    image: finn-backend:${BUILD_ID}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Back/Data:/app/Data
+      - ./Back/PDF Loans:/app/PDF Loans
+      - ./Back/loans_vector.db:/app/loans_vector.db
+      - ./Back/loan_analysis.db:/app/loan_analysis.db
+    environment:
+      - PYTHONPATH=/app
+      - OLLAMA_HOST=http://ollama:11434
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    image: finn-frontend:${BUILD_ID}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE_URL=http://backend:8000
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+EOF
+                
+                # Deploy only application services
+                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
                 
                 echo "=== Waiting for services to start ==="
                 sleep 30
@@ -105,83 +144,82 @@ pipeline {
         
         stage('Health Check') {
             steps {
-                sh '''
-                echo "=== Health Check ==="
-                
-                # Check backend with retries
-                for i in {1..10}; do
-                    if curl -f http://localhost:8000/health >/dev/null 2>&1; then
-                        echo "✅ Backend is healthy"
-                        break
-                    else
-                        echo "⚠️ Backend health check attempt $i/10 failed, retrying..."
-                        if [ $i -eq 10 ]; then
-                            echo "❌ Backend health check failed after 10 attempts"
-                            docker compose -p ${COMPOSE_PROJECT_NAME} logs backend
-                            exit 1
-                        fi
-                        sleep 10
-                    fi
-                done
-                
-                # Check frontend with retries
-                for i in {1..10}; do
-                    if curl -f http://localhost:3000 >/dev/null 2>&1; then
-                        echo "✅ Frontend is accessible"
-                        break
-                    else
-                        echo "⚠️ Frontend check attempt $i/10 failed, retrying..."
-                        if [ $i -eq 10 ]; then
-                            echo "❌ Frontend check failed after 10 attempts"
-                            docker compose -p ${COMPOSE_PROJECT_NAME} logs frontend
-                            exit 1
-                        fi
-                        sleep 10
-                    fi
-                done
-                
-                # Optional: Check monitoring services
-                for service in prometheus grafana alertmanager; do
-                    if docker compose -p ${COMPOSE_PROJECT_NAME} ps | grep -q "$service.*Up"; then
-                        echo "✅ $service is running"
-                    else
-                        echo "⚠️ $service is not running (optional service)"
-                    fi
-                done
-                
-                echo "✅ All application services are running"
-                '''
+                script {
+                    // Backend health check with proper loop
+                    def backendHealthy = false
+                    for (int i = 1; i <= 10; i++) {
+                        try {
+                            sh 'curl -f http://localhost:8000/health'
+                            echo "✅ Backend is healthy"
+                            backendHealthy = true
+                            break
+                        } catch (Exception e) {
+                            echo "⚠️ Backend health check attempt ${i}/10 failed, retrying..."
+                            if (i == 10) {
+                                error "❌ Backend health check failed after 10 attempts"
+                            }
+                            sleep(10)
+                        }
+                    }
+                    
+                    // Frontend health check with proper loop
+                    def frontendHealthy = false
+                    for (int i = 1; i <= 10; i++) {
+                        try {
+                            sh 'curl -f http://localhost:3000'
+                            echo "✅ Frontend is accessible"
+                            frontendHealthy = true
+                            break
+                        } catch (Exception e) {
+                            echo "⚠️ Frontend check attempt ${i}/10 failed, retrying..."
+                            if (i == 10) {
+                                error "❌ Frontend check failed after 10 attempts"
+                            }
+                            sleep(10)
+                        }
+                    }
+                    
+                    if (backendHealthy && frontendHealthy) {
+                        echo "✅ All application services are running"
+                    }
+                }
             }
         }
     }
     
     post {
         always {
-            junit 'Back/test-results/test-results.xml'
-            archiveArtifacts artifacts: 'Back/coverage/coverage.xml', fingerprint: true
+            // Fix JUnit path - look in the correct location
+            junit 'Back/test-results/*.xml'
+            archiveArtifacts artifacts: 'Back/coverage/*.xml', fingerprint: true
+            
+            // Clean up
+            sh '''
+            echo "=== Cleaning up ==="
+            docker compose -p ${COMPOSE_PROJECT_NAME} down -v 2>/dev/null || true
+            '''
         }
         
         success {
             sh '''
-            echo "🎉 FULL STACK DEPLOYMENT SUCCESSFUL! 🎉"
+            echo "🎉 APPLICATION DEPLOYMENT SUCCESSFUL! 🎉"
             echo ""
             echo "Access your services at:"
             echo "Frontend: http://localhost:3000"
             echo "Backend: http://localhost:8000"
             echo "Ollama: http://localhost:11435"
-            echo "Prometheus: http://localhost:9090"
-            echo "Grafana: http://localhost:3001 (admin/admin)"
-            echo "Alertmanager: http://localhost:9093"
             echo ""
-            echo "To deploy Jenkins separately:"
-            echo "docker compose -p ${COMPOSE_PROJECT_NAME} up -d jenkins"
+            echo "To deploy monitoring separately:"
+            echo "docker compose -f docker-compose.monitoring.yml up -d"
             '''
         }
         
         cleanup {
             sh '''
-            # Clean up test images to save space
+            # Clean up images
             docker rmi finn-backend-test:${BUILD_ID} 2>/dev/null || true
+            docker rmi finn-backend:${BUILD_ID} 2>/dev/null || true
+            docker rmi finn-frontend:${BUILD_ID} 2>/dev/null || true
             '''
         }
     }
