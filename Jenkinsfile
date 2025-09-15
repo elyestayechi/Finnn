@@ -182,13 +182,12 @@ EOF
             if (backendRunning && frontendRunning) {
                 echo "✅ All application containers are running"
                 
-                // Optional: Try actual HTTP check with host IP as final verification
+                // Use docker exec to check health from inside the container
                 try {
-                    def hostIp = sh(script: 'hostname -i | awk \'{print $1}\'', returnStdout: true).trim()
-                    sh "curl -f http://${hostIp}:8000/health"
-                    echo "✅ Backend HTTP endpoint is responsive"
+                    sh "docker exec $(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) curl -f http://localhost:8000/health"
+                    echo "✅ Backend HTTP endpoint is responsive (internal check)"
                 } catch (Exception e) {
-                    echo "⚠️ Backend HTTP check failed, but container is running"
+                    error "❌ Backend HTTP endpoint failed internal health check: ${e.message}"
                 }
             }
         }
