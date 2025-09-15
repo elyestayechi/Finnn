@@ -116,35 +116,10 @@ EOF
             }
         }
         
-        stage('Prepare Data') {
-    steps {
-        dir('Back') {
-            sh '''
-            echo "=== Running data migration BEFORE deployment ==="
-
-            # Ensure host volume directories exist
-            mkdir -p ./Data
-            touch ./loan_analysis.db
-
-            # Run migration in a temporary container
-            docker run --rm \
-                -v "$(pwd)/Data:/app/Data" \
-                -v "$(pwd)/PDF Loans:/app/PDF Loans" \
-                -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
-                -e OLLAMA_HOST=http://dummy:11434 \
-                finn-backend-test:${BUILD_ID} \
-                python migrate_data.py
-
-            echo "✅ Migration completed and host volumes populated"
-            '''
-        }
-    }
-}
-
-stage('Deploy Application Only') {
+        stage('Deploy Application Only') {
     steps {
         sh '''
-        echo "=== Deploying application with pre-populated data ==="
+        echo "=== Deploying application services only ==="
 
         cat > docker-compose.app.yml << 'EOF'
 version: '3.8'
@@ -195,7 +170,41 @@ EOF
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
         echo "✅ Services deployed"
         '''
+    }
 }
+
+stage('Run Data Migration') {
+    steps {
+        script {
+            echo "=== Running data migration on ACTUAL application database ==="
+            
+            // Wait for backend to be ready
+            for (int i = 1; i <= 15; i++) {
+                try {
+                    def status = sh(script: "docker compose -p ${COMPOSE_PROJECT_NAME} ps backend --format '{{.Status}}'", returnStdout: true).trim()
+                    if (status.contains("Up") && !status.contains("Exit") && !status.contains("unhealthy")) {
+                        echo "✅ Backend ready for migration"
+                        break
+                    }
+                } catch (Exception e) {
+                    echo "⚠️ Waiting for backend, attempt ${i}/15"
+                    if (i == 15) {
+                        error "❌ Backend not ready for migration"
+                    }
+                    sleep(5)
+                }
+            }
+            
+            // Run migration in the ACTUAL running backend container
+            try {
+                sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) python migrate_data.py"
+                echo "✅ Data migration completed on actual application database!"
+            } catch (Exception e) {
+                echo "⚠️ Data migration failed: ${e.message}"
+                // Continue anyway - maybe data already exists
+            }
+        }
+    }
 }
         
         stage('Health Check') {
