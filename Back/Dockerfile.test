@@ -27,7 +27,7 @@ RUN mkdir -p /app/test-results /app/coverage
 ENV PYTHONPATH=/app
 ENV OLLAMA_HOST=http://dummy:11434  
 
-# Default command to run tests
+# Default command to run tests with explicit paths
 CMD ["python", "-m", "pytest", "tests/", "-v", \
      "--junitxml=/app/test-results/test-results.xml", \
      "--cov=src", \
