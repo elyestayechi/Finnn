@@ -4,6 +4,8 @@ pipeline {
         DOCKER_HOST = 'unix:///var/run/docker.sock'
         COMPOSE_PROJECT_NAME = "finn-${BUILD_ID}"
         PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+        // Set the path to your local data directory
+        LOCAL_DATA_PATH = "/Users/asmatayechi/Desktop/Finn" // UPDATE THIS PATH
     }
     
     stages {
@@ -12,10 +14,48 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/elyestayechi/Finnn.git'
                 
                 sh '''
-                echo "=== Preparing workspace ==="
+                echo "=== Preparing workspace and copying data ==="
                 mkdir -p Back/test-results Back/coverage
+                
+                # Copy data files from local machine to workspace
+                echo "Copying data files from ${LOCAL_DATA_PATH} to workspace..."
+                
+                # Copy Data directory
+                if [ -d "${LOCAL_DATA_PATH}/Back/Data" ]; then
+                    cp -r "${LOCAL_DATA_PATH}/Back/Data" Back/
+                    echo "✅ Copied Data directory"
+                else
+                    echo "⚠️ Data directory not found at ${LOCAL_DATA_PATH}/Back/Data"
+                fi
+                
+                # Copy PDF Loans directory (handle spaces in name)
+                if [ -d "${LOCAL_DATA_PATH}/Back/PDF Loans" ]; then
+                    cp -r "${LOCAL_DATA_PATH}/Back/PDF Loans" Back/
+                    echo "✅ Copied PDF Loans directory"
+                else
+                    echo "⚠️ PDF Loans directory not found at ${LOCAL_DATA_PATH}/Back/PDF Loans"
+                fi
+                
+                # Copy database file
+                if [ -f "${LOCAL_DATA_PATH}/Back/loan_analysis.db" ]; then
+                    cp "${LOCAL_DATA_PATH}/Back/loan_analysis.db" Back/
+                    echo "✅ Copied loan_analysis.db"
+                else
+                    echo "⚠️ loan_analysis.db not found at ${LOCAL_DATA_PATH}/Back/loan_analysis.db"
+                fi
+                
+                # Verify what was copied
+                echo "=== Workspace contents after copy ==="
+                ls -la Back/
+                echo "Data directory:"
+                ls -la Back/Data/ || echo "Data directory not found"
+                echo "PDF Loans directory:"
+                ls -la "Back/PDF Loans/" || echo "PDF Loans directory not found"
+                echo "DB file:"
+                ls -la Back/loan_analysis.db || echo "DB file not found"
+                
                 chmod 755 Back/test-results Back/coverage
-                echo "Workspace prepared"
+                echo "Workspace prepared with data files"
                 '''
             }
         }
@@ -169,6 +209,9 @@ volumes:
   ollama_data:
 EOF
 
+                echo "=== Docker Compose File Content ==="
+                cat docker-compose.app.yml
+                echo "==================================="
                 
                 docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
                 echo "✅ Services deployed with absolute path mounts"
