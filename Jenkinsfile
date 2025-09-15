@@ -184,7 +184,7 @@ EOF
                 
                 // Use docker exec to check health from inside the container
                 try {
-                    sh "docker exec $(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) curl -f http://localhost:8000/health"
+                    sh "docker exec \$(docker compose -p ${COMPOSE_PROJECT_NAME} ps -q backend) curl -f http://localhost:8000/health"
                     echo "✅ Backend HTTP endpoint is responsive (internal check)"
                 } catch (Exception e) {
                     error "❌ Backend HTTP endpoint failed internal health check: ${e.message}"
