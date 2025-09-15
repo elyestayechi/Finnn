@@ -55,22 +55,28 @@ pipeline {
         }
 
         stage('Run Migration Before Deployment') {
-            steps {
-                dir('Back') {
-                    sh '''
-                    echo "=== Running migration in temporary container ==="
-                    docker run --rm \
-                        -v "$(pwd)/Data:/app/Data" \
-                        -v "$(pwd)/PDF Loans:/app/PDF Loans" \
-                        -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
-                        -e OLLAMA_HOST=http://dummy:11434 \
-                        finn-backend-test:${BUILD_ID} \
-                        python migrate_data.py
-                    echo "✅ Host volumes populated with data"
-                    '''
-                }
-            }
+    steps {
+        dir('Back') {
+            sh '''
+            echo "=== Running migration in temporary container ==="
+            docker run --rm \
+                -v "$(pwd)/Data:/app/Data" \
+                -v "$(pwd)/PDF Loans:/app/PDF Loans" \
+                -v "$(pwd)/loan_analysis.db:/app/loan_analysis.db" \
+                -e OLLAMA_HOST=http://dummy:11434 \
+                finn-backend-test:${BUILD_ID} \
+                python migrate_data.py
+
+            # DEBUG: verify host files
+            echo "=== After migration, host volumes ==="
+            ls -la Data
+            ls -la "PDF Loans"
+            ls -la loan_analysis.db
+            echo "✅ Host volumes populated with data"
+            '''
         }
+    }
+}
 
         stage('Deploy Application') {
             steps {
