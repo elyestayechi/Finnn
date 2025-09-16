@@ -92,6 +92,9 @@ pipeline {
         sh '''
         echo "=== Deploying stack without Jenkins ==="
 
+        docker build -t finn-prometheus:${BUILD_ID} ./monitoring/prometheus
+        docker build -t finn-alertmanager:${BUILD_ID} ./monitoring/alertmanager
+
         # Use full directories for Prometheus and Alertmanager
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml up -d \
           ollama backend frontend \

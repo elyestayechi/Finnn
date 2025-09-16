@@ -55,35 +55,28 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus:/etc/prometheus:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    restart: unless-stopped
-    depends_on:
-      - backend
+  build:
+    context: ./monitoring/prometheus
+    dockerfile: Dockerfile
+  image: finn-prometheus:${BUILD_ID}
+  ports:
+    - "9090:9090"
+  volumes:
+    - prometheus_data:/prometheus
+  restart: unless-stopped
+  depends_on:
+    - backend
 
-  alertmanager:
-    image: prom/alertmanager:latest
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./monitoring/alertmanager:/etc/alertmanager:ro
-    command:
-      - '--config.file=/etc/alertmanager/config.yml'
-      - '--storage.path=/alertmanager'
-    restart: unless-stopped
-    depends_on:
-      - prometheus
+alertmanager:
+  build:
+    context: ./monitoring/alertmanager
+    dockerfile: Dockerfile
+  image: finn-alertmanager:${BUILD_ID}
+  ports:
+    - "9093:9093"
+  restart: unless-stopped
+  depends_on:
+    - prometheus
 
   grafana:
     image: grafana/grafana:latest
