@@ -113,6 +113,16 @@ pipeline {
                 '''
             }
         }
+
+       stage('Debug Workspace') {
+    steps {
+        sh 'pwd'
+        sh 'ls -l'
+        sh 'ls -l monitoring || true'
+    }
+}
+
+
     }
 
     post {
