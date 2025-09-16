@@ -117,15 +117,16 @@ DASHBOARD_JSON
         }
 
         stage('Build Monitoring Images') {
-            steps {
-                sh '''
-                echo "=== Building monitoring images ==="
-                docker build -t finn-prometheus:${BUILD_ID} ./monitoring/prometheus
-                docker build -t finn-alertmanager:${BUILD_ID} ./monitoring/alertmanager
-                echo "✅ Monitoring images built"
-                '''
-            }
-        }
+    steps {
+        sh '''
+        echo "=== Building monitoring images ==="
+        docker build -t finn-prometheus:${BUILD_ID} ./monitoring/prometheus
+        docker build -t finn-alertmanager:${BUILD_ID} ./monitoring/alertmanager
+        docker build -t finn-grafana:${BUILD_ID} ./monitoring/grafana
+        echo "✅ Monitoring images built"
+        '''
+    }
+}
 
         stage('Deploy Application with Monitoring') {
             steps {
