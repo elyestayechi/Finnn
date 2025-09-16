@@ -55,28 +55,28 @@ services:
     restart: unless-stopped
 
   prometheus:
-  build:
-    context: ./monitoring/prometheus
-    dockerfile: Dockerfile
-  image: finn-prometheus:${BUILD_ID}
-  ports:
-    - "9090:9090"
-  volumes:
-    - prometheus_data:/prometheus
-  restart: unless-stopped
-  depends_on:
-    - backend
+    build:
+      context: ./monitoring/prometheus
+      dockerfile: Dockerfile
+    image: finn-prometheus:${BUILD_ID}
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    depends_on:
+      - backend
 
-alertmanager:
-  build:
-    context: ./monitoring/alertmanager
-    dockerfile: Dockerfile
-  image: finn-alertmanager:${BUILD_ID}
-  ports:
-    - "9093:9093"
-  restart: unless-stopped
-  depends_on:
-    - prometheus
+  alertmanager:
+    build:
+      context: ./monitoring/alertmanager
+      dockerfile: Dockerfile
+    image: finn-alertmanager:${BUILD_ID}
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
 
   grafana:
     image: grafana/grafana:latest

@@ -92,10 +92,12 @@ pipeline {
         sh '''
         echo "=== Deploying stack without Jenkins ==="
 
+        # Step 1: Build Prometheus and Alertmanager images with embedded configs
         docker build -t finn-prometheus:${BUILD_ID} ./monitoring/prometheus
         docker build -t finn-alertmanager:${BUILD_ID} ./monitoring/alertmanager
 
-        # Use full directories for Prometheus and Alertmanager
+        # Step 2: Deploy the stack using docker-compose
+        # Use the corrected docker-compose.yml (no host file mounts for Prometheus/Alertmanager)
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml up -d \
           ollama backend frontend \
           prometheus alertmanager grafana
