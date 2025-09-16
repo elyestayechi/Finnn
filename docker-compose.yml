@@ -59,7 +59,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus:/etc/prometheus   # Mount the whole directory
+      # Mount the entire prometheus folder; inside container /etc/prometheus/prometheus.yml will exist
+      - ./monitoring/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -77,7 +78,8 @@ services:
     ports:
       - "9093:9093"
     volumes:
-      - ./monitoring/alertmanager:/etc/alertmanager   # Mount the whole directory
+      # Mount the entire alertmanager folder; inside container /etc/alertmanager/config.yml will exist
+      - ./monitoring/alertmanager:/etc/alertmanager
     command:
       - '--config.file=/etc/alertmanager/config.yml'
       - '--storage.path=/alertmanager'

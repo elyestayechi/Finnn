@@ -92,8 +92,10 @@ pipeline {
         sh '''
         echo "=== Deploying stack without Jenkins ==="
 
+        # Use full directories for Prometheus and Alertmanager
         docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.yml up -d \
-          ollama backend frontend prometheus alertmanager grafana
+          ollama backend frontend \
+          prometheus alertmanager grafana
 
         echo "✅ App + Monitoring deployed (Jenkins excluded)"
         '''
