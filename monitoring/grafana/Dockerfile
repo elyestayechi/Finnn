@@ -15,7 +15,7 @@ COPY provisioning/dashboards/*.json /etc/grafana/provisioning/dashboards/
 
 # Set permissions
 USER root
-RUN chown -R grafana:grafana /etc/grafana/provisioning
+RUN chown -R grafana:grafana /etc/grafana
 USER grafana
 
 # Expose port
