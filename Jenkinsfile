@@ -57,27 +57,17 @@ pipeline {
 }
 
 
-        stage('Build Backend with Data') {
-            steps {
-                dir('Back') {
-                    sh '''
-                    echo "=== Building backend image with embedded data ==="
-                    
-                    # Build the image (data will be copied into the image during build)
-                    docker build -t finn-backend:${BUILD_ID} -f Dockerfile .
-                    
-                    # Run migration INSIDE the built image
-                    echo "=== Running data migration in the built image ==="
-                    docker run --rm \
-                        -e OLLAMA_HOST=http://dummy:11434 \
-                        finn-backend:${BUILD_ID} \
-                        python migrate_data.py
-                    
-                    echo "✅ Data migration completed inside image"
-                    '''
-                }
-            }
-        }
+        stage('Build Backend') {
+  steps {
+    dir('Back') {
+      sh '''
+      echo "=== Building backend image ==="
+      docker build -t finn-backend:${BUILD_ID} -f Dockerfile .
+      echo "✅ Backend image built"
+      '''
+    }
+  }
+}
 
         stage('Build Frontend') {
             steps {
