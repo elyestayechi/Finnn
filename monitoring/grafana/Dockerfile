@@ -13,10 +13,9 @@ COPY provisioning/dashboards/dashboards.yml /etc/grafana/provisioning/dashboards
 # Copy dashboard JSON files
 COPY provisioning/dashboards/*.json /etc/grafana/provisioning/dashboards/
 
-# Set permissions
 USER root
-RUN chown -R grafana:grafana /etc/grafana
-USER grafana
+RUN chown -R 472:472 /etc/grafana/provisioning
+USER 472
 
 # Expose port
 EXPOSE 3000
