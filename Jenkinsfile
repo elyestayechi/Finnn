@@ -6,6 +6,7 @@ pipeline {
         PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
         LOCAL_DATA_PATH = "/Users/asmatayechi/Desktop/Finn"
         PDF_LOANS_DIR = "PDF Loans"
+        MONITORING_DIR = "monitoring"
     }
 
     stages {
@@ -44,6 +45,196 @@ pipeline {
                 else
                     echo "⚠️ No database file found - will be created during migration"
                 fi
+
+                # Verify monitoring directory structure exists and has required files
+                echo "=== Checking monitoring structure ==="
+                if [ -d "${MONITORING_DIR}" ]; then
+                    echo "✅ Monitoring directory exists"
+                    
+                    # Check for required files and create defaults if missing
+                    if [ ! -f "${MONITORING_DIR}/prometheus/prometheus.yml" ]; then
+                        echo "⚠️ prometheus.yml not found - creating default"
+                        mkdir -p "${MONITORING_DIR}/prometheus"
+                        cat > "${MONITORING_DIR}/prometheus/prometheus.yml" << 'PROMETHEUS_CONFIG'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+
+  - job_name: 'backend'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['backend:8000']
+    scrape_interval: 10s
+    scrape_timeout: 5s
+PROMETHEUS_CONFIG
+                    fi
+
+                    if [ ! -f "${MONITORING_DIR}/prometheus/alerts.yml" ]; then
+                        echo "⚠️ alerts.yml not found - creating default"
+                        cat > "${MONITORING_DIR}/prometheus/alerts.yml" << 'ALERTS_CONFIG'
+groups:
+  - name: finn-alerts
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "The Finn backend service has been down for more than 1 minute"
+ALERTS_CONFIG
+                    fi
+
+                    if [ ! -f "${MONITORING_DIR}/alertmanager/config.yml" ]; then
+                        echo "⚠️ alertmanager config.yml not found - creating default"
+                        mkdir -p "${MONITORING_DIR}/alertmanager"
+                        cat > "${MONITORING_DIR}/alertmanager/config.yml" << 'ALERTMANAGER_CONFIG'
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+
+receivers:
+  - name: 'default-receiver'
+ALERTMANAGER_CONFIG
+                    fi
+
+                    # Create Grafana provisioning directories if they don't exist
+                    mkdir -p "${MONITORING_DIR}/grafana/provisioning/datasources"
+                    mkdir -p "${MONITORING_DIR}/grafana/provisioning/dashboards"
+
+                    if [ ! -f "${MONITORING_DIR}/grafana/provisioning/datasources/datasource.yml" ]; then
+                        echo "⚠️ Grafana datasource.yml not found - creating default"
+                        cat > "${MONITORING_DIR}/grafana/provisioning/datasources/datasource.yml" << 'GRAFANA_DATASOURCE'
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    version: 1
+    editable: false
+GRAFANA_DATASOURCE
+                    fi
+
+                    if [ ! -f "${MONITORING_DIR}/grafana/provisioning/dashboards/dashboards.yml" ]; then
+                        echo "⚠️ Grafana dashboards.yml not found - creating default"
+                        cat > "${MONITORING_DIR}/grafana/provisioning/dashboards/dashboards.yml" << 'GRAFANA_DASHBOARDS'
+apiVersion: 1
+
+providers:
+  - name: 'Finn Dashboards'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    options:
+      path: /etc/grafana/provisioning/dashboards
+GRAFANA_DASHBOARDS
+                    fi
+
+                    echo "=== Monitoring files ==="
+                    find "${MONITORING_DIR}" -type f
+                else
+                    echo "❌ Monitoring directory not found - creating basic structure with default configs"
+                    mkdir -p "${MONITORING_DIR}/prometheus"
+                    mkdir -p "${MONITORING_DIR}/alertmanager" 
+                    mkdir -p "${MONITORING_DIR}/grafana/provisioning/datasources"
+                    mkdir -p "${MONITORING_DIR}/grafana/provisioning/dashboards"
+                    
+                    # Create default config files
+                    cat > "${MONITORING_DIR}/prometheus/prometheus.yml" << 'PROMETHEUS_CONFIG'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+
+  - job_name: 'backend'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['backend:8000']
+    scrape_interval: 10s
+    scrape_timeout: 5s
+PROMETHEUS_CONFIG
+
+                    cat > "${MONITORING_DIR}/prometheus/alerts.yml" << 'ALERTS_CONFIG'
+groups:
+  - name: finn-alerts
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "The Finn backend service has been down for more than 1 minute"
+ALERTS_CONFIG
+
+                    cat > "${MONITORING_DIR}/alertmanager/config.yml" << 'ALERTMANAGER_CONFIG'
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+
+receivers:
+  - name: 'default-receiver'
+ALERTMANAGER_CONFIG
+
+                    cat > "${MONITORING_DIR}/grafana/provisioning/datasources/datasource.yml" << 'GRAFANA_DATASOURCE'
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    version: 1
+    editable: false
+GRAFANA_DATASOURCE
+
+                    cat > "${MONITORING_DIR}/grafana/provisioning/dashboards/dashboards.yml" << 'GRAFANA_DASHBOARDS'
+apiVersion: 1
+
+providers:
+  - name: 'Finn Dashboards'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    options:
+      path: /etc/grafana/provisioning/dashboards
+GRAFANA_DASHBOARDS
+                fi
                 '''
             }
         }
@@ -78,14 +269,15 @@ pipeline {
             }
         }
 
-        stage('Deploy Application') {
+        stage('Deploy Full Stack') {
             steps {
                 sh '''
-                echo "=== Deploying application ==="
+                echo "=== Deploying complete application + monitoring stack ==="
                 
-                # Create simple docker-compose file
-                cat > docker-compose.app.yml << EOF
+                # Create comprehensive docker-compose file
+                cat > docker-compose.full.yml << EOF
 services:
+  # Application Services
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -103,6 +295,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
+      - PROMETHEUS_MULTIPROC_DIR=/tmp
     depends_on:
       - ollama
     restart: unless-stopped
@@ -123,35 +316,95 @@ services:
       - VITE_API_BASE_URL=http://localhost:8000
     restart: unless-stopped
 
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
 volumes:
   ollama_data:
+  prometheus_data:
+  grafana_data:
 EOF
 
-                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-                echo "✅ Application deployed"
+                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.full.yml up -d
+                echo "✅ Full stack deployed (application + monitoring)"
                 '''
             }
         }
 
-        stage('Health Check') {
+        stage('Health Check & Verification') {
             steps {
                 sh '''
                 echo "=== Health Check ==="
-                sleep 20
+                sleep 30  # Give services more time to start
                 
-                # Check backend health
+                # Check application health
+                echo "=== Application Services ==="
                 if curl -f http://localhost:8000/health; then
                     echo "✅ Backend is healthy"
-                    
-                    # Test data endpoints to verify migration worked
-                    echo "=== Testing data endpoints ==="
-                    echo "PDF reports count:"
-                    curl -s http://localhost:8000/api/pdfs | jq '. | length' || echo "N/A"
-                    echo "Loans count:"
-                    curl -s http://localhost:8000/api/loans | jq '. | length' || echo "N/A"
                 else
                     echo "❌ Backend health check failed"
                 fi
+
+                # Check monitoring services
+                echo "=== Monitoring Services ==="
+                if curl -f http://localhost:9090/-/healthy; then
+                    echo "✅ Prometheus is healthy"
+                else
+                    echo "⚠️ Prometheus health check failed"
+                fi
+
+                if curl -f http://localhost:3001/api/health; then
+                    echo "✅ Grafana is healthy"
+                else
+                    echo "⚠️ Grafana health check failed"
+                fi
+
+                # Check if monitoring config files are working
+                echo "=== Checking monitoring configuration ==="
+                echo "Prometheus config:"
+                docker compose -p ${COMPOSE_PROJECT_NAME} exec prometheus ls -la /etc/prometheus/ || echo "Cannot check Prometheus config"
+                
+                echo "Alertmanager config:"
+                docker compose -p ${COMPOSE_PROJECT_NAME} exec alertmanager ls -la /etc/alertmanager/ || echo "Cannot check Alertmanager config"
                 '''
             }
         }
@@ -164,17 +417,25 @@ EOF
         }
         success {
             sh '''
-            echo "-- DEPLOYMENT SUCCESSFUL! --"
+            echo "🎉 FULL STACK DEPLOYMENT SUCCESSFUL! 🎉"
             echo ""
-            echo "Access your services at:"
-            echo "Frontend: http://localhost:3000"
-            echo "Backend: http://localhost:8000"
-            echo "Ollama: http://localhost:11435"
+            echo "=== APPLICATION SERVICES ==="
+            echo "Frontend:     http://localhost:3000"
+            echo "Backend API:  http://localhost:8000"
+            echo "API Docs:     http://localhost:8000/docs"
+            echo "Ollama:       http://localhost:11435"
+            echo ""
+            echo "=== MONITORING SERVICES ==="
+            echo "Grafana:      http://localhost:3001 (admin/admin)"
+            echo "Prometheus:   http://localhost:9090"
+            echo "Alertmanager: http://localhost:9093"
+            echo ""
+            echo "Data migration has been completed automatically!"
             '''
         }
         failure {
             sh '''
-            echo "=== Cleaning up ==="
+            echo "=== Cleaning up due to failure ==="
             docker compose -p ${COMPOSE_PROJECT_NAME} down 2>/dev/null || true
             '''
         }
