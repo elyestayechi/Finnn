@@ -48,6 +48,15 @@ pipeline {
             }
         }
 
+        stage('Debug Workspace') {
+    steps {
+        sh 'pwd'
+        sh 'ls -l'
+        sh 'ls -l monitoring || true'
+    }
+}
+
+
         stage('Build Backend with Data') {
             steps {
                 dir('Back') {
@@ -114,14 +123,7 @@ pipeline {
             }
         }
 
-       stage('Debug Workspace') {
-    steps {
-        sh 'pwd'
-        sh 'ls -l'
-        sh 'ls -l monitoring || true'
-    }
-}
-
+       
 
     }
 
