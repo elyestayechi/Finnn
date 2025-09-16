@@ -6,6 +6,7 @@ pipeline {
         PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
         LOCAL_DATA_PATH = "/Users/asmatayechi/Desktop/Finn"
         PDF_LOANS_DIR = "PDF Loans"
+        MONITORING_DIR = "monitoring"
     }
 
     stages {
@@ -44,6 +45,19 @@ pipeline {
                 else
                     echo "⚠️ No database file found - will be created during migration"
                 fi
+
+                # Verify monitoring directory structure exists
+                echo "=== Checking monitoring structure ==="
+                if [ -d "${MONITORING_DIR}" ]; then
+                    echo "✅ Monitoring directory exists"
+                    find "${MONITORING_DIR}" -type f | head -10
+                else
+                    echo "❌ Monitoring directory not found - creating basic structure"
+                    mkdir -p "${MONITORING_DIR}/prometheus"
+                    mkdir -p "${MONITORING_DIR}/alertmanager" 
+                    mkdir -p "${MONITORING_DIR}/grafana/provisioning/datasources"
+                    mkdir -p "${MONITORING_DIR}/grafana/provisioning/dashboards"
+                fi
                 '''
             }
         }
@@ -78,14 +92,15 @@ pipeline {
             }
         }
 
-        stage('Deploy Application') {
+        stage('Deploy Full Stack') {
             steps {
                 sh '''
-                echo "=== Deploying application ==="
+                echo "=== Deploying complete application + monitoring stack ==="
                 
-                # Create simple docker-compose file
-                cat > docker-compose.app.yml << EOF
+                # Create comprehensive docker-compose file
+                cat > docker-compose.full.yml << EOF
 services:
+  # Application Services
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -95,6 +110,12 @@ services:
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 120s
 
   backend:
     image: finn-backend:${BUILD_ID}
@@ -103,6 +124,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - OLLAMA_HOST=http://ollama:11434
+      - PROMETHEUS_MULTIPROC_DIR=/tmp
     depends_on:
       - ollama
     restart: unless-stopped
@@ -123,23 +145,74 @@ services:
       - VITE_API_BASE_URL=http://localhost:8000
     restart: unless-stopped
 
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
 volumes:
   ollama_data:
+  prometheus_data:
+  grafana_data:
 EOF
 
-                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.app.yml up -d
-                echo "✅ Application deployed"
+                docker compose -p ${COMPOSE_PROJECT_NAME} -f docker-compose.full.yml up -d
+                echo "✅ Full stack deployed (application + monitoring)"
                 '''
             }
         }
 
-        stage('Health Check') {
+        stage('Health Check & Verification') {
             steps {
                 sh '''
                 echo "=== Health Check ==="
-                sleep 20
+                sleep 30  # Give services more time to start
                 
-                # Check backend health
+                # Check application health
+                echo "=== Application Services ==="
                 if curl -f http://localhost:8000/health; then
                     echo "✅ Backend is healthy"
                     
@@ -152,6 +225,43 @@ EOF
                 else
                     echo "❌ Backend health check failed"
                 fi
+
+                # Check monitoring services
+                echo "=== Monitoring Services ==="
+                if curl -f http://localhost:9090/-/healthy; then
+                    echo "✅ Prometheus is healthy"
+                else
+                    echo "⚠️ Prometheus health check failed"
+                fi
+
+                if curl -f http://localhost:3001/api/health; then
+                    echo "✅ Grafana is healthy"
+                else
+                    echo "⚠️ Grafana health check failed"
+                fi
+
+                # Check if monitoring targets are being scraped
+                echo "=== Prometheus Targets ==="
+                curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[].labels.job' | grep -E "(backend|prometheus)" || echo "Could not fetch targets"
+                '''
+            }
+        }
+
+        stage('Configure Monitoring') {
+            steps {
+                sh '''
+                echo "=== Finalizing monitoring setup ==="
+                
+                # Wait for Grafana to be fully ready
+                sleep 15
+                
+                # Check if datasource was provisioned correctly
+                echo "=== Checking Grafana datasource ==="
+                curl -u admin:admin http://localhost:3001/api/datasources 2>/dev/null | jq '.[].name' || echo "Could not fetch datasources"
+                
+                # Check if dashboards were provisioned
+                echo "=== Checking Grafana dashboards ==="
+                curl -u admin:admin http://localhost:3001/api/search 2>/dev/null | jq '.[].title' || echo "Could not fetch dashboards"
                 '''
             }
         }
@@ -164,17 +274,30 @@ EOF
         }
         success {
             sh '''
-            echo "🎉 DEPLOYMENT SUCCESSFUL! 🎉"
+            echo "🎉 FULL STACK DEPLOYMENT SUCCESSFUL! 🎉"
             echo ""
-            echo "Access your services at:"
-            echo "Frontend: http://localhost:3000"
-            echo "Backend: http://localhost:8000"
-            echo "Ollama: http://localhost:11435"
+            echo "=== APPLICATION SERVICES ==="
+            echo "Frontend:     http://localhost:3000"
+            echo "Backend API:  http://localhost:8000"
+            echo "API Docs:     http://localhost:8000/docs"
+            echo "Ollama:       http://localhost:11435"
+            echo ""
+            echo "=== MONITORING SERVICES ==="
+            echo "Grafana:      http://localhost:3001 (admin/admin)"
+            echo "Prometheus:   http://localhost:9090"
+            echo "Alertmanager: http://localhost:9093"
+            echo ""
+            echo "=== NEXT STEPS ==="
+            echo "1. Open Grafana and explore the pre-built dashboards"
+            echo "2. Check that Prometheus is scraping backend metrics"
+            echo "3. Verify your data is loaded by checking the API endpoints"
+            echo ""
+            echo "Data migration has been completed automatically!"
             '''
         }
         failure {
             sh '''
-            echo "=== Cleaning up ==="
+            echo "=== Cleaning up due to failure ==="
             docker compose -p ${COMPOSE_PROJECT_NAME} down 2>/dev/null || true
             '''
         }
