@@ -353,6 +353,50 @@
         "comments": "the analysis was good overall, but given the risk score it should be approve next time, but good job overall ! ",
         "timestamp": "2025-08-24T15:52:22.294141"
       }
+    },
+    {
+      "feedback_id": "fb_34257_1758103064",
+      "loan_data": {
+        "loan_id": "34257",
+        "pdf_path": "PDF Loans/loan_assessment_34257_20250917_105523.pdf"
+      },
+      "original_analysis": {
+        "summary": "The loan application presents several concerns including assets almost equal to the loan amount, a\nhigh APR suggesting overleaving, and possible underfunding or fraud.\nRECOMMENDATION: REVIEW\nDetailed Rationale:\n-Key difference 1 with historical context: The loan amount is very close to the asset value, which\ncould indicate underfunding or fraudulent activity.\n-Key difference 2 with trend analysis: The high APR suggests overleaving, which was not\npreviously reported in similar cases.\nKey Findings:\n-Specific finding 1 with impact analysis: Assets are nearly equal to the loan amount, indicating\npotential underfunding or fraud.\n-Specific finding 2 with impact analysis: High APR indicates possible overleaving, which may have\nbeen overlooked in past applications.\nRecommended Conditions:\n-Conditions applied if approving: The significant deviation from historical patterns and emerging\nrisks make this application more concerning.\n-Verification needed if reviewing: Further investigation is required to assess the underlying\ncauses of the discrepancy between assets and loan amount.\nSimilar Historical Cases\nCase #1 (Similarity: 0.67)\nCustomer: afef bent elnnaser bouzaiene\nLoan Amount: 19,998.40\nRisk Score: 26.0\nDecision: DENY\nanalysis_type: contextual\nConfidential - Generated on 2025-09-17 10:55:23 Page 4/5\ncustomer: afef bent elnnaser bouzaiene\nhas_feedback: False\namount: 19998.4\ntimestamp: 1754649748.603439\nrisk_score: 26.0\nprocessing_time: 91.2528681755066\nCase #2 (Similarity: 0.66)\nCustomer: Mbarka Bent mohamed benhmid\nLoan Amount: 6,000.00\nRisk Score: 46.0\nDecision: APPROVE\ntimestamp: 1755170589.816299\nrisk_score: 46.0\namount: 6000.0\nhas_feedback: False\nprocessing_time: 67.30867409706116\ncustomer: Mbarka Bent mohamed benhmid\nanalysis_type: contextual\nBranch Information\nBranch Name: AGENCE SIDI BOUZID\nBranch Description: AGENCE SIDI BOUZID\nLoan Officer: Marwen Badri (Loan Officer)\nConfidential - Generated on 2025-09-17 10:55:23 Page 5/5",
+        "recommendation": "review",
+        "key_findings": [
+          "Specific finding 1 with impact analysis: Assets are nearly equal to the loan amount, indicating",
+          "potential underfunding or fraud.",
+          "Specific finding 2 with impact analysis: High APR indicates possible overleaving, which may have",
+          "been overlooked in past applications.",
+          "Recommended Conditions:",
+          "Conditions applied if approving: The significant deviation from historical patterns and emerging",
+          "risks make this application more concerning.",
+          "Verification needed if reviewing: Further investigation is required to assess the underlying",
+          "causes of the discrepancy between assets and loan amount.",
+          "Similar Historical Cases"
+        ],
+        "conditions": [
+          "Conditions applied if approving: The significant deviation from historical patterns and emerging",
+          "risks make this application more concerning.",
+          "Verification needed if reviewing: Further investigation is required to assess the underlying",
+          "causes of the discrepancy between assets and loan amount.",
+          "Similar Historical Cases",
+          "Case #1 (Similarity: 0.67)",
+          "Customer: afef bent elnnaser bouzaiene",
+          "Loan Amount: 19,998.40",
+          "Risk Score: 26.0",
+          "Decision: DENY"
+        ]
+      },
+      "feedback": {
+        "loan_id": "34257",
+        "analyst_id": "human_1",
+        "agent_recommendation": "review",
+        "human_decision": "review",
+        "rating": 5,
+        "comments": "i love this analysis, good job",
+        "timestamp": "2025-09-17T10:57:44.214467"
+      }
     }
   ]
 }

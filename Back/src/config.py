@@ -14,7 +14,7 @@ VECTOR_DB_PATH = DATA_DIR / 'loans_vector.db'
 API_CONFIG = {
     'loan_url': "http://172.16.4.110:8080/credit-service/loans/find-pagination",
     'udf_url': "http://172.16.4.110:8080/credit-service/udf-links/find-udf-groupby/",
-    'token': "Bearer de2b28f4-2ef5-42eb-9382-ad6d2d5f9f18"
+    'token': "Bearer 201df18e-c9dc-46b6-856b-d8912f2050a1"
 }
 
 # LLM Configuration

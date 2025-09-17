@@ -184,7 +184,7 @@ async def run_loan_processing(loan_id: Optional[str] = None,
 
 if __name__ == "__main__":
     # Example usage - you can modify these IDs directly
-    LOAN_ID = "33415"  # Replace with actual loan ID or None
-    EXTERNAL_ID = "33421"  # Replace with actual external ID or None
+    LOAN_ID = "34257"  # Replace with actual loan ID or None
+    EXTERNAL_ID = "34263"  # Replace with actual external ID or None
     
     asyncio.run(run_loan_processing(loan_id=LOAN_ID, external_id=EXTERNAL_ID))

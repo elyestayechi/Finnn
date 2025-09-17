@@ -3968,3 +3968,110 @@ Traceback (most recent call last):
   File "/Users/asmatayechi/Desktop/OllamaOpt 9/analyse.py", line 181, in run_loan_processing
     raise SystemExit(1) from e
 SystemExit: 1
+2025-09-17 10:23:48,868 - __main__ - INFO - ==================================================
+2025-09-17 10:23:48,868 - __main__ - INFO - Starting new loan assessment session
+2025-09-17 10:23:48,869 - __main__ - INFO - Execution time: 2025-09-17T10:23:48.869028
+2025-09-17 10:23:48,869 - __main__ - INFO - ==================================================
+2025-09-17 10:23:48,869 - __main__ - INFO - Initializing system components
+2025-09-17 10:23:49,686 - src.llm.vector_db - ERROR - Vector DB initialization failed: module 'chromadb.utils.embedding_functions' has no attribute 'OllamaEmbeddingFunction'
+2025-09-17 10:23:49,686 - __main__ - ERROR - Component initialization failed: module 'chromadb.utils.embedding_functions' has no attribute 'OllamaEmbeddingFunction'
+2025-09-17 10:23:49,691 - __main__ - CRITICAL - Fatal error in loan processing:
+module 'chromadb.utils.embedding_functions' has no attribute 'OllamaEmbeddingFunction'
+Traceback (most recent call last):
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 149, in run_loan_processing
+    components = await initialize_components()
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 52, in initialize_components
+    vector_db = LoanVectorDB()
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/llm/vector_db.py", line 13, in __init__
+    self.embedding_function = embedding_functions.OllamaEmbeddingFunction(
+AttributeError: module 'chromadb.utils.embedding_functions' has no attribute 'OllamaEmbeddingFunction'
+
+2025-09-17 10:49:49,107 - __main__ - INFO - ==================================================
+2025-09-17 10:49:49,109 - __main__ - INFO - Starting new loan assessment session
+2025-09-17 10:49:49,109 - __main__ - INFO - Execution time: 2025-09-17T10:49:49.109404
+2025-09-17 10:49:49,109 - __main__ - INFO - ==================================================
+2025-09-17 10:49:49,109 - __main__ - INFO - Initializing system components
+2025-09-17 10:49:50,836 - src.llm.vector_db - INFO - Vector DB initialized at loans_vector.db
+2025-09-17 10:49:51,080 - src.llm.analyzer - INFO - Downloading embedding model: nomic-embed-text
+2025-09-17 10:49:52,007 - src.llm.analyzer - INFO - Downloading generation model: deepseek-r1:1.5b
+2025-09-17 10:49:52,652 - __main__ - INFO - All components initialized successfully
+2025-09-17 10:49:52,652 - __main__ - INFO - Fetching loan data from API
+2025-09-17 10:49:53,080 - src.api_client - ERROR - API Error 401: {"error":"invalid_token","error_description":"de2b28f4-2ef5-42eb-9382-ad6d2d5f9f18"}
+2025-09-17 10:49:53,080 - src.data_loader - ERROR - Error loading loan data: API request failed: {"error":"invalid_token","error_description":"de2b28f4-2ef5-42eb-9382-ad6d2d5f9f18"}
+2025-09-17 10:49:53,080 - __main__ - ERROR - Loan processing failed: API request failed: {"error":"invalid_token","error_description":"de2b28f4-2ef5-42eb-9382-ad6d2d5f9f18"}
+2025-09-17 10:49:53,092 - __main__ - CRITICAL - Fatal error in loan processing:
+API request failed: {"error":"invalid_token","error_description":"de2b28f4-2ef5-42eb-9382-ad6d2d5f9f18"}
+Traceback (most recent call last):
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/api_client.py", line 47, in fetch_loan_data
+    response.raise_for_status()
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 ' for url 'http://172.16.4.110:8080/credit-service/loans/find-pagination'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 153, in run_loan_processing
+    assessment = await process_loan(
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 76, in process_loan
+    raw_loan_data = await data_loader.load_loan_data(loan_id, external_id)
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/data_loader.py", line 21, in load_loan_data
+    loan_data = await self.api_client.fetch_loan_data(loan_id, external_id)
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/api_client.py", line 65, in fetch_loan_data
+    raise ValueError(f"API request failed: {e.response.text}")
+ValueError: API request failed: {"error":"invalid_token","error_description":"de2b28f4-2ef5-42eb-9382-ad6d2d5f9f18"}
+
+2025-09-17 10:51:50,119 - __main__ - INFO - ==================================================
+2025-09-17 10:51:50,122 - __main__ - INFO - Starting new loan assessment session
+2025-09-17 10:51:50,122 - __main__ - INFO - Execution time: 2025-09-17T10:51:50.122379
+2025-09-17 10:51:50,122 - __main__ - INFO - ==================================================
+2025-09-17 10:51:50,122 - __main__ - INFO - Initializing system components
+2025-09-17 10:51:50,910 - src.llm.vector_db - INFO - Vector DB initialized at loans_vector.db
+2025-09-17 10:51:51,183 - src.llm.analyzer - INFO - Downloading embedding model: nomic-embed-text
+2025-09-17 10:51:51,899 - src.llm.analyzer - INFO - Downloading generation model: deepseek-r1:1.5b
+2025-09-17 10:51:52,498 - __main__ - INFO - All components initialized successfully
+2025-09-17 10:51:52,499 - __main__ - INFO - Fetching loan data from API
+2025-09-17 10:51:52,642 - src.api_client - ERROR - Loan data fetch failed: Loan API returned empty results for ID 34486
+2025-09-17 10:51:52,642 - src.data_loader - ERROR - Error loading loan data: Loan API returned empty results for ID 34486
+2025-09-17 10:51:52,643 - __main__ - ERROR - Loan processing failed: Loan API returned empty results for ID 34486
+2025-09-17 10:51:52,646 - __main__ - CRITICAL - Fatal error in loan processing:
+Loan API returned empty results for ID 34486
+Traceback (most recent call last):
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 153, in run_loan_processing
+    assessment = await process_loan(
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 76, in process_loan
+    raw_loan_data = await data_loader.load_loan_data(loan_id, external_id)
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/data_loader.py", line 21, in load_loan_data
+    loan_data = await self.api_client.fetch_loan_data(loan_id, external_id)
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/api_client.py", line 51, in fetch_loan_data
+    raise ValueError(f"Loan API returned empty results for ID {loan_id or external_id}")
+ValueError: Loan API returned empty results for ID 34486
+
+2025-09-17 10:53:19,074 - __main__ - INFO - ==================================================
+2025-09-17 10:53:19,075 - __main__ - INFO - Starting new loan assessment session
+2025-09-17 10:53:19,075 - __main__ - INFO - Execution time: 2025-09-17T10:53:19.075812
+2025-09-17 10:53:19,075 - __main__ - INFO - ==================================================
+2025-09-17 10:53:19,075 - __main__ - INFO - Initializing system components
+2025-09-17 10:53:19,419 - src.llm.vector_db - INFO - Vector DB initialized at loans_vector.db
+2025-09-17 10:53:19,479 - src.llm.analyzer - INFO - Downloading embedding model: nomic-embed-text
+2025-09-17 10:53:19,986 - src.llm.analyzer - INFO - Downloading generation model: deepseek-r1:1.5b
+2025-09-17 10:53:20,470 - __main__ - INFO - All components initialized successfully
+2025-09-17 10:53:20,471 - __main__ - INFO - Fetching loan data from API
+2025-09-17 10:53:22,234 - __main__ - INFO - Performing risk assessment
+2025-09-17 10:53:22,235 - __main__ - INFO - Risk assessment completed - Score: 54.0, Level: risque très élevé
+2025-09-17 10:53:22,235 - __main__ - INFO - Applying business rules
+2025-09-17 10:53:22,235 - __main__ - INFO - Starting AI analysis
+2025-09-17 10:53:25,097 - src.llm.vector_db - INFO - Found 2 similar loans (min similarity: 0.6)
+2025-09-17 10:55:22,088 - src.llm.analyzer - INFO - Analysis completed (contextual) in 119.85s
+2025-09-17 10:55:22,093 - __main__ - INFO - AI Recommendation: REVIEW
+2025-09-17 10:55:22,116 - __main__ - INFO - Generating PDF report
+2025-09-17 10:55:23,110 - src.reporting.pdf - INFO - Successfully loaded DejaVu font family
+2025-09-17 10:55:23,442 - src.reporting.pdf - INFO - Successfully generated PDF report: PDF Loans/loan_assessment_34257_20250917_105523.pdf
+2025-09-17 10:55:23,442 - __main__ - INFO - Report generated: PDF Loans/loan_assessment_34257_20250917_105522.pdf
+2025-09-17 10:55:27,130 - src.llm.analyzer - INFO - Successfully stored loan 34257 in vector DB
+2025-09-17 10:55:27,131 - __main__ - INFO - ==================================================
+2025-09-17 10:55:27,131 - __main__ - INFO - Processing completed successfully
+2025-09-17 10:55:27,132 - __main__ - INFO - Final report: /Users/asmatayechi/Desktop/Finn/Back/PDF Loans/loan_assessment_34257_20250917_105522.pdf
+2025-09-17 10:55:27,132 - __main__ - INFO - ==================================================
+2025-09-17 10:57:44,240 - src.llm.feedback - INFO - Feedback stored for loan 34257
