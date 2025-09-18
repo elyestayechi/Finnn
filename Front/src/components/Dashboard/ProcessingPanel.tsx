@@ -1,3 +1,4 @@
+// ProcessingPanel.tsx - Enhanced version
 import { useState, useEffect } from 'react';
 import { Terminal, Play, Check } from 'lucide-react';
 import { useAnalysisWebSocket } from '@/hooks/useAnalysisWebSocket';
@@ -51,28 +52,31 @@ export default function ProcessingPanel({ analysisId, onCompletion }: Processing
         </div>
       </div>
 
-      <div className="terminal-output min-h-[160px] max-h-[240px] overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-md p-3 text-xs">
+      <div className="terminal-output min-h-[160px] max-h-[240px] overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-md p-3 text-xs font-mono">
         {logs.map((log, index) => (
-          <div key={index} className="flex items-center space-x-2 mb-1 animate-fade-in">
+          <div key={index} className="flex items-start space-x-2 mb-1 animate-fade-in">
             {log.includes('complete') || log.includes('✅') ? (
-              <Check className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <Check className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+            ) : log.includes('error') || log.includes('failed') ? (
+              <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0 mt-1"></div>
             ) : (
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse-slow flex-shrink-0 mt-1"></div>
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
             )}
-            <span className="text-gray-700 dark:text-gray-300">{log}</span>
+            <span className="text-gray-700 dark:text-gray-300 break-words">{log}</span>
           </div>
         ))}
         
         {progress < 100 && !error && (
-          <div className="flex items-center space-x-2 animate-pulse">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-            <span className="text-gray-500 dark:text-gray-400">Processing...</span>
+          <div className="flex items-center space-x-2 animate-pulse text-gray-500 dark:text-gray-400">
+            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+            <span>Processing...</span>
           </div>
         )}
         
         {error && (
-          <div className="text-red-600 dark:text-red-400 text-sm">
-            Error: {error}
+          <div className="text-red-600 dark:text-red-400 text-sm flex items-start space-x-2">
+            <div className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0 mt-1"></div>
+            <span>Error: {error}</span>
           </div>
         )}
       </div>

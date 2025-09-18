@@ -4075,3 +4075,74 @@ ValueError: Loan API returned empty results for ID 34486
 2025-09-17 10:55:27,132 - __main__ - INFO - Final report: /Users/asmatayechi/Desktop/Finn/Back/PDF Loans/loan_assessment_34257_20250917_105522.pdf
 2025-09-17 10:55:27,132 - __main__ - INFO - ==================================================
 2025-09-17 10:57:44,240 - src.llm.feedback - INFO - Feedback stored for loan 34257
+2025-09-17 14:58:09,273 - __main__ - INFO - ==================================================
+2025-09-17 14:58:09,275 - __main__ - INFO - Starting new loan assessment session
+2025-09-17 14:58:09,275 - __main__ - INFO - Execution time: 2025-09-17T14:58:09.275636
+2025-09-17 14:58:09,275 - __main__ - INFO - ==================================================
+2025-09-17 14:58:09,275 - __main__ - INFO - Initializing system components
+2025-09-17 14:58:09,558 - src.llm.vector_db - INFO - Vector DB initialized at loans_vector.db
+2025-09-17 14:58:09,659 - src.llm.analyzer - INFO - Downloading embedding model: nomic-embed-text
+2025-09-17 14:58:10,600 - src.llm.analyzer - INFO - Downloading generation model: deepseek-r1:1.5b
+2025-09-17 14:58:11,282 - __main__ - INFO - All components initialized successfully
+2025-09-17 14:58:11,283 - __main__ - INFO - Fetching loan data from API
+2025-09-17 14:58:16,293 - src.api_client - ERROR - Loan data fetch failed: 
+2025-09-17 14:58:16,294 - src.data_loader - ERROR - Error loading loan data: 
+2025-09-17 14:58:16,294 - __main__ - ERROR - Loan processing failed: 
+2025-09-17 14:58:16,300 - __main__ - CRITICAL - Fatal error in loan processing:
+
+Traceback (most recent call last):
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_transports/default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_async/connection.py", line 101, in handle_async_request
+    raise exc
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_async/connection.py", line 78, in handle_async_request
+    stream = await self._connect(request)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_async/connection.py", line 124, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_backends/auto.py", line 31, in connect_tcp
+    return await self._backend.connect_tcp(
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_backends/anyio.py", line 113, in connect_tcp
+    with map_exceptions(exc_map):
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 160, in run_loan_processing
+    assessment = await process_loan(
+  File "/Users/asmatayechi/Desktop/Finn/Back/analyse.py", line 83, in process_loan
+    raw_loan_data = await data_loader.load_loan_data(loan_id, external_id)
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/data_loader.py", line 21, in load_loan_data
+    loan_data = await self.api_client.fetch_loan_data(loan_id, external_id)
+  File "/Users/asmatayechi/Desktop/Finn/Back/src/api_client.py", line 41, in fetch_loan_data
+    response = await self.client.post(
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_client.py", line 1859, in post
+    return await self.request(
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_transports/default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Users/asmatayechi/miniconda3/envs/llama_env/lib/python3.10/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectTimeout
+

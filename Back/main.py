@@ -503,44 +503,35 @@ async def get_recent_analyses(
         logger.error(f"Error fetching analyses: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching analyses: {str(e)}")
 
-# Analysis creation endpoint (simplified) with metrics
+# Analysis creation endpoint 
 @app.post("/api/analyses")
 async def create_analysis(loan_data: Dict[str, Any]):
-    """Create a new loan analysis (simulated for frontend compatibility)"""
-    loan_id = loan_data.get('loan_id', 'unknown')
+    """Create a new loan analysis - requires both loan_id and external_id"""
+    loan_id = loan_data.get('loan_id')
+    external_id = loan_data.get('external_id')
+    
+    if not loan_id or not external_id:
+        raise HTTPException(
+            status_code=400, 
+            detail="Both loan_id and external_id are required"
+        )
+    
     ANALYSIS_TOTAL.labels(loan_id=loan_id).inc()
     start_time = time.time()
     
     try:
         analysis_id = str(uuid.uuid4())
         
-        # Simulate analysis process
-        asyncio.run(manager.send_message(analysis_id, {
-            "type": "status",
-            "message": "Analysis started",
-            "progress": 10
-        }))
-        
-        await asyncio.sleep(1)
-        
-        asyncio.run(manager.send_message(analysis_id, {
-            "type": "status", 
-            "message": "Processing data",
-            "progress": 50
-        }))
-        
-        await asyncio.sleep(1)
-        
-        asyncio.run(manager.send_message(analysis_id, {
-            "type": "status",
-            "message": "Analysis complete",
-            "progress": 100
-        }))
+        # Start the analysis process in the background
+        asyncio.create_task(run_analysis_process(
+            analysis_id, 
+            loan_id, 
+            external_id, 
+            loan_data.get('notes')
+        ))
         
         # Record success
         ANALYSIS_SUCCESS.inc()
-        ANALYSIS_DECISION.labels(decision="approved").inc()  # Default decision for simulation
-        ANALYSIS_RISK_SCORE.labels(loan_id=loan_id).set(5.0)  # Default risk score
         
         return {"analysis_id": analysis_id}
         
@@ -552,6 +543,101 @@ async def create_analysis(loan_data: Dict[str, Any]):
     finally:
         processing_time = time.time() - start_time
         ANALYSIS_PROCESSING_TIME.observe(processing_time)
+
+async def run_analysis_process(analysis_id: str, loan_id: str, external_id: str, notes: Optional[str]):
+    """Run the analysis process in the background"""
+    try:
+        # Notify start
+        await manager.send_message(analysis_id, {
+            "type": "status",
+            "message": f"Starting analysis for Loan ID: {loan_id}, External ID: {external_id}",
+            "progress": 10
+        })
+        
+        # Prepare command - both IDs are required
+        cmd = ["python", "analyse.py", "--loan-id", loan_id, "--external-id", external_id]
+        
+        if notes:
+            cmd.extend(["--notes", notes])
+        
+        # Run the analysis
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd="./Back"  # Run from Back directory
+        )
+        
+        # Read output in real-time
+        progress = 10
+        while True:
+            line = await process.stdout.readline()
+            if not line:
+                break
+                
+            output = line.decode().strip()
+            logger.info(f"Analysis {analysis_id} output: {output}")
+            
+            # Send progress updates based on specific output patterns
+            if "Processing completed successfully" in output:
+                await manager.send_message(analysis_id, {
+                    "type": "status",
+                    "message": "Analysis completed successfully",
+                    "progress": 100
+                })
+                progress = 100
+            elif "Risk assessment completed" in output:
+                progress = min(90, progress + 20)
+                await manager.send_message(analysis_id, {
+                    "type": "status",
+                    "message": output,
+                    "progress": progress
+                })
+            elif "AI analysis" in output or "Generating PDF" in output:
+                progress = min(80, progress + 15)
+                await manager.send_message(analysis_id, {
+                    "type": "status",
+                    "message": output,
+                    "progress": progress
+                })
+            elif "Processing" in output or "Analysis" in output:
+                progress = min(70, progress + 5)
+                await manager.send_message(analysis_id, {
+                    "type": "status",
+                    "message": output,
+                    "progress": progress
+                })
+            else:
+                # Send other output as status messages without changing progress
+                await manager.send_message(analysis_id, {
+                    "type": "status",
+                    "message": output,
+                    "progress": progress
+                })
+        
+        # Wait for process to complete
+        await process.wait()
+        
+        if process.returncode == 0:
+            await manager.send_message(analysis_id, {
+                "type": "result",
+                "message": "Analysis completed successfully",
+                "data": {"loan_id": loan_id, "external_id": external_id}
+            })
+        else:
+            error_output = await process.stderr.read()
+            error_msg = error_output.decode().strip()
+            await manager.send_message(analysis_id, {
+                "type": "error",
+                "message": f"Analysis failed: {error_msg}"
+            })
+            
+    except Exception as e:
+        logger.error(f"Analysis process error: {e}")
+        await manager.send_message(analysis_id, {
+            "type": "error",
+            "message": f"Analysis process error: {str(e)}"
+        })
 
 # Feedback endpoints
 @app.post("/feedback/", response_model=schemas.Feedback, status_code=status.HTTP_201_CREATED)

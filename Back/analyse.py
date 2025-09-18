@@ -1,9 +1,16 @@
+# analyse.py - Complete version with both command line and direct execution support
 import logging
 import traceback
 import asyncio
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
+import argparse
+import sys
+
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent))
+
 from src.config import LOG_FILE, PDF_DIR
 from src.data_loader import DataLoader
 from src.risk_engine import RiskEngine, BusinessRulesEngine
@@ -182,9 +189,38 @@ async def run_loan_processing(loan_id: Optional[str] = None,
     finally:
         await data_loader.close()
 
-if __name__ == "__main__":
-    # Example usage - you can modify these IDs directly
-    LOAN_ID = "34257"  # Replace with actual loan ID or None
-    EXTERNAL_ID = "34263"  # Replace with actual external ID or None
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description='Run loan analysis')
+    parser.add_argument('--loan-id', type=str, help='Loan ID to analyze')
+    parser.add_argument('--external-id', type=str, help='External ID to analyze')
+    parser.add_argument('--notes', type=str, help='Additional notes for the analysis')
+    return parser.parse_args()
+
+def main():
+    """Main function for direct execution"""
+    args = parse_arguments()
     
-    asyncio.run(run_loan_processing(loan_id=LOAN_ID, external_id=EXTERNAL_ID))
+    # Use provided IDs or fall back to defaults if running directly
+    loan_id = args.loan_id if args.loan_id else "33415"
+    external_id = args.external_id if args.external_id else "33421"
+    
+    print(f"Starting analysis with Loan ID: {loan_id}, External ID: {external_id}")
+    if args.notes:
+        print(f"Notes: {args.notes}")
+    
+    # Run the analysis
+    asyncio.run(run_loan_processing(loan_id=loan_id, external_id=external_id))
+
+# Function to be called from the frontend
+async def run_analysis_from_frontend(loan_id: str, external_id: str, notes: Optional[str] = None):
+    """Run analysis with parameters from frontend"""
+    print(f"Starting analysis from frontend with Loan ID: {loan_id}, External ID: {external_id}")
+    if notes:
+        print(f"Notes: {notes}")
+    
+    return await run_loan_processing(loan_id=loan_id, external_id=external_id)
+
+if __name__ == "__main__":
+    # This runs when executed directly from command line
+    main()

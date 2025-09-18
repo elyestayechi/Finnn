@@ -1,3 +1,4 @@
+// AnalysisModal.tsx - Corrected version
 import { useState } from 'react';
 import { X, Upload, Search, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { createAnalysis } from '@/lib/api';
 
 interface AnalysisData {
-  type: 'loan-id' | 'external-id';
-  value: string;
+  loan_id: string;
+  external_id: string;
   notes: string;
 }
 
@@ -20,20 +21,21 @@ interface AnalysisModalProps {
 }
 
 export default function AnalysisModal({ isOpen, onClose, onAnalysisStarted }: AnalysisModalProps) {
-  const [inputType, setInputType] = useState<'loan-id' | 'external-id'>('loan-id');
-  const [inputValue, setInputValue] = useState('');
+  const [loanId, setLoanId] = useState('');
+  const [externalId, setExternalId] = useState('');
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!loanId.trim() || !externalId.trim()) return;
 
     setIsLoading(true);
     
     try {
       const loanData = {
-        [inputType === 'loan-id' ? 'loan_id' : 'external_id']: inputValue,
+        loan_id: loanId.trim(),
+        external_id: externalId.trim(),
         notes
       };
       
@@ -42,7 +44,8 @@ export default function AnalysisModal({ isOpen, onClose, onAnalysisStarted }: An
       onClose();
       
       // Reset form
-      setInputValue('');
+      setLoanId('');
+      setExternalId('');
       setNotes('');
     } catch (error) {
       console.error('Failed to start analysis:', error);
@@ -59,60 +62,31 @@ export default function AnalysisModal({ isOpen, onClose, onAnalysisStarted }: An
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Input Type Selection */}
+          {/* Loan ID Field */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-900 dark:text-white">Analysis Input</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setInputType('loan-id')}
-                className={`p-3 rounded-md border transition-all text-sm ${
-                  inputType === 'loan-id'
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400'
-                }`}
-              >
-                <Search className="w-4 h-4 mx-auto mb-1" />
-                <div className="text-xs">Loan ID</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputType('external-id')}
-                className={`p-3 rounded-md border transition-all text-sm ${
-                  inputType === 'external-id'
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400'
-                }`}
-              >
-                <Upload className="w-4 h-4 mx-auto mb-1" />
-                <div className="text-xs">External ID</div>
-              </button>
-            </div>
+            <Label htmlFor="loan-id" className="text-sm font-medium text-gray-900 dark:text-white">
+              Loan ID *
+            </Label>
+            <Input
+              id="loan-id"
+              value={loanId}
+              onChange={(e) => setLoanId(e.target.value)}
+              placeholder="e.g., 33415"
+              className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 text-sm"
+              required
+            />
           </div>
 
-          {/* Input Field */}
+          {/* External ID Field */}
           <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="input-value" className="text-sm font-medium text-gray-900 dark:text-white">
-                {inputType === 'loan-id' ? 'Loan ID' : 'External ID'}
-              </Label>
-              <div className="group relative">
-                <HelpCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block">
-                  <div className="bg-gray-900 dark:bg-gray-700 text-white dark:text-gray-200 text-xs rounded-md p-2 whitespace-nowrap shadow-lg">
-                    {inputType === 'loan-id' 
-                      ? 'Enter the internal loan identifier (e.g., LN-2024-001)'
-                      : 'Enter the external system reference ID'
-                    }
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Label htmlFor="external-id" className="text-sm font-medium text-gray-900 dark:text-white">
+              External ID *
+            </Label>
             <Input
-              id="input-value"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={inputType === 'loan-id' ? 'LN-2024-001' : 'EXT-REF-12345'}
+              id="external-id"
+              value={externalId}
+              onChange={(e) => setExternalId(e.target.value)}
+              placeholder="e.g., 33421"
               className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 dark:focus:border-blue-400 text-sm"
               required
             />
@@ -145,7 +119,7 @@ export default function AnalysisModal({ isOpen, onClose, onAnalysisStarted }: An
             </Button>
             <Button
               type="submit"
-              disabled={!inputValue.trim() || isLoading}
+              disabled={!loanId.trim() || !externalId.trim() || isLoading}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
             >
               {isLoading ? (

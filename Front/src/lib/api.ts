@@ -61,6 +61,13 @@ export interface Rule {
   Weight: string;
 }
 
+export interface AnalysisRequest {
+  loan_id: string;        
+  external_id: string;    
+  notes?: string;
+}
+
+
 // Analysis API
 export const analysisApi = {
   getAnalysis: async (loanId: string): Promise<AnalysisData> => {
@@ -202,4 +209,16 @@ export const rulesApi = {
 };
 
 // Export the createAnalysis function directly for backward compatibility
-export const createAnalysis = analysisApi.createAnalysis;
+export const createAnalysis = async (loanData: AnalysisRequest): Promise<{ analysis_id: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/analyses`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(loanData),
+  });
+
+  if (!response.ok) throw new Error('Failed to create analysis');
+  
+  return response.json();
+}
