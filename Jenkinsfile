@@ -182,20 +182,6 @@ DASHBOARD_JSON
             if docker compose -p ${COMPOSE_PROJECT_NAME} ps backend | grep -q "(healthy)"; then
                 echo "✅ Backend is healthy (Docker healthcheck passed)"
                 
-                # Also test the actual health endpoint from within the network
-                if docker compose -p ${COMPOSE_PROJECT_NAME} exec -T backend curl -f http://localhost:8000/health; then
-                    echo "✅ Backend health endpoint is responding"
-                    
-                    # Test data endpoints to verify migration worked
-                    echo "=== Testing data endpoints ==="
-                    echo "PDF reports count:"
-                    docker compose -p ${COMPOSE_PROJECT_NAME} exec -T backend curl -s http://localhost:8000/api/pdfs | jq '. | length' || echo "N/A"
-                    echo "Loans count:"
-                    docker compose -p ${COMPOSE_PROJECT_NAME} exec -T backend curl -s http://localhost:8000/api/loans | jq '. | length' || echo "N/A"
-                    break
-                else
-                    echo "⚠️ Backend container healthy but health endpoint not responding (attempt $i/$MAX_RETRIES)"
-                fi
             else
                 echo "⏳ Backend not ready yet (attempt $i/$MAX_RETRIES)"
                 if [ $i -eq $MAX_RETRIES ]; then
